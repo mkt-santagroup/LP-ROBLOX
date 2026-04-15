@@ -1,0 +1,84 @@
+.player {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 9/16;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 4px solid #fff;
+  background: #000;
+}
+
+.video { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.playbtn {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255,255,255,0.92);
+  border: 4px solid #fff;
+  color: #22c55e;
+  font-size: 2.2rem;
+  width: 82px; height: 82px;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 0 #14532d, 0 8px 24px rgba(0,0,0,0.3);
+  transition: transform 0.15s;
+  padding-left: 6px;
+}
+.playbtn:hover { transform: translate(-50%, -50%) scale(1.08); }
+
+.pauseOv {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.88);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 15;
+  cursor: pointer;
+  padding: 24px;
+}
+.pauseOv.show { display: flex; }
+
+.scare {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.scareIcon { font-size: 4.5rem; animation: sirenPulse 0.9s infinite alternate; }
+
+.scare h2 {
+  color: #fff;
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.7rem;
+  line-height: 1.1;
+  text-shadow: 2px 2px 0 #ff4500;
+}
+
+.resume {
+  background: linear-gradient(180deg, #ff5c5c 0%, #ef4444 100%);
+  color: #fff;
+  border: 3px solid #7f1d1d;
+  box-shadow: 0 5px 0 #7f1d1d;
+  padding: 12px 28px;
+  border-radius: 12px;
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.tap { position: absolute; inset: 0; cursor: pointer; z-index: 5; display: none; }
+.tap.show { display: block; }
+
+@keyframes sirenPulse {
+  0%   { transform: scale(1); }
+  100% { transform: scale(1.08); }
+}

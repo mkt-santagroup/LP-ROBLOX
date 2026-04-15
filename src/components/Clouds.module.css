@@ -1,0 +1,46 @@
+.clouds {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.cloud {
+  position: absolute;
+  background: rgba(255,255,255,0.82);
+  border-radius: 999px;
+}
+.cloud::before, .cloud::after {
+  content: '';
+  position: absolute;
+  background: inherit;
+  border-radius: 999px;
+}
+
+.c1 { width: 100px; height: 38px; top: 6%; left: 5%; animation: drift1 20s ease-in-out infinite; }
+.c1::before { width: 58px; height: 50px; top: -26px; left: 16px; }
+.c1::after  { width: 40px; height: 34px; top: -16px; left: 46px; }
+
+.c2 { width: 80px; height: 30px; top: 12%; right: 8%; animation: drift2 26s ease-in-out infinite; }
+.c2::before { width: 46px; height: 40px; top: -20px; left: 12px; }
+.c2::after  { width: 32px; height: 26px; top: -12px; left: 34px; }
+
+.c3 { width: 120px; height: 34px; top: 3%; left: 38%; animation: drift1 34s ease-in-out infinite reverse; opacity: 0.6; }
+.c3::before { width: 66px; height: 54px; top: -28px; left: 20px; }
+.c3::after  { width: 44px; height: 36px; top: -18px; left: 56px; }
+
+.c4 { width: 70px; height: 26px; top: 18%; left: 20%; animation: drift2 22s ease-in-out infinite; opacity: 0.5; }
+.c4::before { width: 40px; height: 34px; top: -18px; left: 10px; }
+.c4::after  { width: 28px; height: 22px; top: -10px; left: 28px; }
+
+@keyframes drift1 {
+  0%   { transform: translateX(0px); }
+  50%  { transform: translateX(40px); }
+  100% { transform: translateX(0px); }
+}
+@keyframes drift2 {
+  0%   { transform: translateX(0px); }
+  50%  { transform: translateX(-40px); }
+  100% { transform: translateX(0px); }
+}

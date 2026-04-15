@@ -1,4 +1,5 @@
 import React from 'react';
+import styles from './ProgressBar.module.css';
 
 interface ProgressBarProps {
   progress: number;
@@ -6,11 +7,11 @@ interface ProgressBarProps {
 }
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, isUnlocked }) => (
-  <div className="vsl-progress-wrap" id="progress-wrap">
-    <div className="vsl-progress-track">
+  <div className={styles.progressWrap} id="progress-wrap">
+    <div className={styles.progressTrack}>
       <div 
         id="prog-fill"
-        className={`vsl-progress-fill ${isUnlocked ? 'unlocked' : ''}`} 
+        className={`${styles.progressFill} ${isUnlocked ? styles.unlocked : ''}`} 
         style={{ width: `${progress}%` }}
       ></div>
     </div>

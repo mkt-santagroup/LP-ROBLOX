@@ -5,6 +5,7 @@ import { CTAButton } from './components/CTAButton';
 import { ProgressBar } from './components/ProgressBar';
 import { VideoPlayer } from './components/VideoPlayer';
 import { getMockData } from './lib/supabase';
+import styles from './App.module.css';
 
 const TOTAL_TIME = 20;
 const UNLOCK_TIME = TOTAL_TIME * 0.8; // 80% do vídeo
@@ -70,7 +71,7 @@ export default function App() {
   if (!data) return null;
 
   return (
-    <div className="page">
+    <div className={styles.page}>
       <Clouds />
       <Header logoUrl={data.logoUrl} />
       <CTAButton state={state} onClick={handleCTA} label={label} />
