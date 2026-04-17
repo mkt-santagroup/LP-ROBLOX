@@ -1,24 +1,25 @@
-/* Contêiner responsivo com proporção 16:9 */
+/* Contêiner com proporção de CELULAR (9:16) */
 .player {
   position: relative;
   width: 100%;
-  padding-bottom: 56.25%; /* Isso garante a proporção 16:9 */
-  height: 0;
+  max-width: 360px;
+  margin: 0 auto;
+  aspect-ratio: 9/16; /* <--- ISSO AQUI RESOLVE O CORTE DO VÍDEO */
+  border-radius: 20px;
   overflow: hidden;
-  background-color: black; /* Fundo preto enquanto o vídeo não carrega */
+  border: 4px solid #fff;
+  background: #000;
 }
 
-/* Vídeo ocupando todo o espaço do contêiner */
 .video {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover; /* Garante que a thumb cubra a área sem distorcer */
+  object-fit: cover;
 }
 
-/* Contêiner invisível do botão para cobrir todo o vídeo e centralizar o play */
 .playButtonContainer {
   position: absolute;
   top: 0;
@@ -28,7 +29,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 10; /* Fica acima do vídeo */
+  z-index: 10;
   background: none;
   border: none;
   cursor: pointer;
@@ -36,17 +37,15 @@
   outline: none;
 }
 
-/* Efeito de hover para o botão */
 .playButtonContainer:hover .playButton {
     transform: scale(1.1);
 }
 
-/* Estilo do botão circular vermelho */
 .playButton {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background-color: rgba(239, 68, 68, 0.9); /* Vermelho proeminente */
+  background-color: rgba(239, 68, 68, 0.9);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -54,22 +53,18 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-/* Estilo do ícone de play dentro do botão */
 .playButton svg {
   width: 40px;
   height: 40px;
   fill: white;
-  margin-left: 5px; /* Ajuste para centralizar visualmente o triângulo */
+  margin-left: 5px;
 }
 
-/* --- AJUSTES PARA CELULAR --- */
 @media (max-width: 640px) {
-  /* Diminui o tamanho do botão em telas pequenas */
   .playButton {
     width: 60px;
     height: 60px;
   }
-  
   .playButton svg {
     width: 30px;
     height: 30px;
@@ -77,9 +72,6 @@
   }
 }
 
-/* --- Estilos Existentes (Mantidos e Melhorados) --- */
-
-/* Overlay de Pausa (Invisível) */
 .tap {
     position: absolute;
     top: 0;
@@ -95,7 +87,6 @@
     display: block;
 }
 
-/* Overlay de Pausa (Scare) */
 .pauseOv {
   position: absolute;
   top: 0;
@@ -103,7 +94,7 @@
   width: 100%;
   height: 100%;
   z-index: 20;
-  background-color: rgba(0, 0, 0, 0.85); /* Fundo mais escuro */
+  background-color: rgba(0, 0, 0, 0.85);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -136,9 +127,8 @@
     text-transform: uppercase;
 }
 
-/* Botão de Continuar no Scare (Estilo YouTube) */
 .resume {
-    background-color: #ef4444; /* Vermelho padrão */
+    background-color: #ef4444;
     color: white;
     border: none;
     padding: 12px 24px;
@@ -151,5 +141,5 @@
 }
 
 .resume:hover {
-    background-color: #dc2626; /* Vermelho mais escuro no hover */
+    background-color: #dc2626;
 }
