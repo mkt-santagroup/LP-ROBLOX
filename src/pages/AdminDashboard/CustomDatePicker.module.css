@@ -1,0 +1,176 @@
+.container {
+  position: relative;
+  font-family: var(--font-montserrat), sans-serif;
+}
+
+.triggerBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #16161b;
+  border: 1px solid #2a2a35;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  min-width: 260px;
+  justify-content: space-between;
+}
+
+.triggerBtn:hover {
+  border-color: #a855f7;
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background-color: #16161b;
+  border: 1px solid #2a2a35;
+  border-radius: 12px;
+  padding: 16px;
+  width: 320px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  z-index: 50;
+}
+
+/* Botões Rápidos */
+.quickFilters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #2a2a35;
+}
+
+.quickBtn {
+  flex: 1;
+  background-color: #1a1b23;
+  border: 1px solid transparent;
+  color: #8b8b93;
+  padding: 8px 0;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quickBtn:hover {
+  background-color: #2a2a35;
+  color: #fff;
+}
+
+.quickBtn.active {
+  border-color: #a855f7;
+  color: #a855f7;
+  background-color: rgba(168, 85, 247, 0.1);
+}
+
+/* Header do Calendário */
+.calendarHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.monthTitle {
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+}
+
+.navBtn {
+  background: transparent;
+  border: none;
+  color: #8b8b93;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.navBtn:hover {
+  background-color: #2a2a35;
+  color: #fff;
+}
+
+/* Grid de Dias */
+.weekDays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 12px;
+  color: #8b8b93;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.daysGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px 0;
+}
+
+.dayCell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 36px;
+  position: relative;
+}
+
+.dayBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  z-index: 2;
+  transition: background-color 0.1s;
+}
+
+.dayBtn:hover:not(.selected) {
+  background-color: #2a2a35;
+}
+
+.dayBtn.empty {
+  cursor: default;
+  background: transparent;
+}
+
+/* Estados de Seleção */
+.dayBtn.selected {
+  background-color: #a855f7;
+  color: #fff;
+  font-weight: bold;
+}
+
+/* Fundo para dias entre a data inicial e final */
+.inRangeBg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: rgba(168, 85, 247, 0.15);
+  z-index: 1;
+}
+
+.inRangeBg.start {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+
+.inRangeBg.end {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+}

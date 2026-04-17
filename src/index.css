@@ -12,12 +12,20 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* src/index.css */
+/* src/index.css */
 body {
   min-height: 100vh;
-  background: url('/background.png') center top / cover no-repeat fixed;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  background-color: #f0f2f5; /* Cor de fundo neutra para o admin */
   font-family: 'Nunito', sans-serif;
   overflow-x: hidden;
+  /* Removemos o display: flex daqui! */
+}
+
+/* Adicione essa regra para forçar o React a ocupar a tela inteira */
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }

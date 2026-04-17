@@ -1,0 +1,214 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
+
+.container {
+  background-color: #0d0d12;
+  color: #ffffff;
+  min-height: 100vh;
+  padding: 32px;
+  font-family: 'Montserrat', sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32px;
+}
+
+.titleArea h1 {
+  font-size: 32px;
+  font-weight: 800;
+  margin: 0 0 8px 0;
+}
+
+.titleArea p {
+  color: #8b8b93;
+  font-size: 14px;
+  margin: 0;
+  font-weight: 500;
+}
+
+.controlsArea {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inputGroup label {
+  font-size: 12px;
+  color: #8b8b93;
+  font-weight: 500;
+}
+
+/* Títulos de cada fileira */
+.sectionHeader {
+  font-size: 15px;
+  color: #fff;
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #1f1f27;
+}
+
+/* Forçamos Exatamente 3 Colunas como o Maresia */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+.kpiCard {
+  background-color: #16161b;
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid #1f1f27;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s;
+}
+
+.kpiCard:hover {
+  border-color: #2a2a35;
+}
+
+.kpiTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.kpiTitle {
+  font-size: 11px;
+  color: #8b8b93;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.kpiValue {
+  font-size: 32px;
+  font-weight: 800;
+  margin-top: 8px;
+}
+
+.kpiIcon {
+  padding: 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kpiBottom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.kpiCompare {
+  font-size: 12px;
+  color: #8b8b93;
+  font-weight: 500;
+}
+
+/* Grid de Marcos (Exatamente 6 blocos pra ficar na mesma linha) */
+.milestoneGrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+.milestoneCard {
+  background-color: #16161b;
+  border-radius: 12px;
+  padding: 20px 16px;
+  border: 1px solid #1f1f27;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  transition: border-color 0.2s;
+}
+
+.milestoneCard:hover {
+  border-color: #3b82f6;
+}
+
+.milestoneTitle {
+  font-size: 11px;
+  color: #8b8b93;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.milestoneValue {
+  font-size: 28px;
+  font-weight: 800;
+  color: #fff;
+  margin: 4px 0;
+}
+
+.milestoneRate {
+  font-size: 11px;
+  color: #3b82f6;
+  font-weight: 700;
+  background-color: rgba(59, 130, 246, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+/* Layout Principal do Gráfico */
+.mainGrid {
+  display: flex;
+  flex-direction: column;
+  flex: 1; 
+}
+
+.chartCard {
+  background-color: #16161b;
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid #1f1f27;
+  display: flex;
+  flex-direction: column;
+  flex: 1; 
+  min-height: 450px; 
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.cardTitle {
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chartWrapper {
+  flex: 1; 
+  width: 100%;
+  min-height: 300px;
+}
