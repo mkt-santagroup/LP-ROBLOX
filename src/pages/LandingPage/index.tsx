@@ -75,23 +75,25 @@ export const LandingPage = () => {
     }
   };
 
-  if (!data) return null;
-
   return (
     <div className={styles.landingWrapper}>
-      <div className={styles.page}>
-        <Clouds />
-        <Header logoUrl={data.logoUrl} />
-        <CTAButton state={state} onClick={handleCTA} label={label} />
-        <ProgressBar progress={(elapsed / TOTAL_TIME) * 100} isUnlocked={state === 'unlocked'} />
-        <VideoPlayer 
-          videoUrl={data.videoUrl} 
-          isPlaying={isPlaying} 
-          onPlay={handlePlay} 
-          onPause={() => setIsPlaying(false)} 
-          videoRef={videoRef}
-        />
-      </div>
+      {/* Nuvens e Fundo renderizam IMEDIATAMENTE, tirando a sensação de tela travada */}
+      <Clouds /> 
+      
+      {data && (
+        <div className={styles.page}>
+          <Header logoUrl={data.logoUrl} />
+          <CTAButton state={state} onClick={handleCTA} label={label} />
+          <ProgressBar progress={(elapsed / TOTAL_TIME) * 100} isUnlocked={state === 'unlocked'} />
+          <VideoPlayer 
+            videoUrl={data.videoUrl} 
+            isPlaying={isPlaying} 
+            onPlay={handlePlay} 
+            onPause={() => setIsPlaying(false)} 
+            videoRef={videoRef}
+          />
+        </div>
+      )}
     </div>
   );
 };

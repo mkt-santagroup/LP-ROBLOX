@@ -38,16 +38,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       <video 
         ref={videoRef}
         id="vsl-video"
-        src={videoUrl} /* <-- REMOVIDO o #t=0.001, agora o poster vai brilhar! */
+        src={videoUrl}
         poster="/thumb.png"
         playsInline 
-        preload="auto"
+        preload="metadata" /* <--- OTIMIZAÇÃO: Não baixa o vídeo inteiro à toa */
         className={styles.video}
       ></video>
 
-      {/* Botão de Play Inicial Seguro */}
+      {/* Botão de Play Inicial Seguro e Personalizado */}
       {!hasStarted && (
-        <button className={styles.playbtn} onClick={onPlay}>&#9654;</button>
+        <button className={styles.playButtonContainer} onClick={onPlay}>
+          <div className={styles.playButton}>
+             <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          </div>
+        </button>
       )}
 
       {/* Overlay de Pausa (Scare) */}

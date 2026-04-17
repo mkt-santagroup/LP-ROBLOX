@@ -1,84 +1,155 @@
+/* Contêiner responsivo com proporção 16:9 */
 .player {
   position: relative;
   width: 100%;
-  max-width: 360px;
-  aspect-ratio: 9/16;
-  border-radius: 20px;
+  padding-bottom: 56.25%; /* Isso garante a proporção 16:9 */
+  height: 0;
   overflow: hidden;
-  border: 4px solid #fff;
-  background: #000;
+  background-color: black; /* Fundo preto enquanto o vídeo não carrega */
 }
 
-.video { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-.playbtn {
+/* Vídeo ocupando todo o espaço do contêiner */
+.video {
   position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(255,255,255,0.92);
-  border: 4px solid #fff;
-  color: #22c55e;
-  font-size: 2.2rem;
-  width: 82px; height: 82px;
-  border-radius: 50%;
-  cursor: pointer;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 0 #14532d, 0 8px 24px rgba(0,0,0,0.3);
-  transition: transform 0.15s;
-  padding-left: 6px;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Garante que a thumb cubra a área sem distorcer */
 }
-.playbtn:hover { transform: translate(-50%, -50%) scale(1.08); }
 
+/* Contêiner invisível do botão para cobrir todo o vídeo e centralizar o play */
+.playButtonContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10; /* Fica acima do vídeo */
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  outline: none;
+}
+
+/* Efeito de hover para o botão */
+.playButtonContainer:hover .playButton {
+    transform: scale(1.1);
+}
+
+/* Estilo do botão circular vermelho */
+.playButton {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: rgba(239, 68, 68, 0.9); /* Vermelho proeminente */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: transform 0.2s ease-out;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Estilo do ícone de play dentro do botão */
+.playButton svg {
+  width: 40px;
+  height: 40px;
+  fill: white;
+  margin-left: 5px; /* Ajuste para centralizar visualmente o triângulo */
+}
+
+/* --- AJUSTES PARA CELULAR --- */
+@media (max-width: 640px) {
+  /* Diminui o tamanho do botão em telas pequenas */
+  .playButton {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .playButton svg {
+    width: 30px;
+    height: 30px;
+    margin-left: 3px;
+  }
+}
+
+/* --- Estilos Existentes (Mantidos e Melhorados) --- */
+
+/* Overlay de Pausa (Invisível) */
+.tap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 5;
+    background: transparent;
+    cursor: pointer;
+    display: none;
+}
+.tap.show {
+    display: block;
+}
+
+/* Overlay de Pausa (Scare) */
 .pauseOv {
   position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.88);
-  display: none;
-  align-items: center;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 20;
+  background-color: rgba(0, 0, 0, 0.85); /* Fundo mais escuro */
+  display: flex;
   justify-content: center;
-  z-index: 15;
+  align-items: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
   cursor: pointer;
-  padding: 24px;
 }
-.pauseOv.show { display: flex; }
+
+.pauseOv.show {
+  opacity: 1;
+  visibility: visible;
+}
 
 .scare {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
   text-align: center;
+  color: white;
+  max-width: 80%;
+  padding: 20px;
 }
 
-.scareIcon { font-size: 4.5rem; animation: sirenPulse 0.9s infinite alternate; }
+.scareIcon {
+  font-size: 50px;
+  margin-bottom: 20px;
+}
 
 .scare h2 {
-  color: #fff;
-  font-family: 'Fredoka One', cursive;
-  font-size: 1.7rem;
-  line-height: 1.1;
-  text-shadow: 2px 2px 0 #ff4500;
+    font-size: 24px;
+    margin-bottom: 20px;
+    text-transform: uppercase;
 }
 
+/* Botão de Continuar no Scare (Estilo YouTube) */
 .resume {
-  background: linear-gradient(180deg, #ff5c5c 0%, #ef4444 100%);
-  color: #fff;
-  border: 3px solid #7f1d1d;
-  box-shadow: 0 5px 0 #7f1d1d;
-  padding: 12px 28px;
-  border-radius: 12px;
-  font-family: 'Fredoka One', cursive;
-  font-size: 1.1rem;
-  cursor: pointer;
+    background-color: #ef4444; /* Vermelho padrão */
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background-color 0.2s ease;
 }
 
-.tap { position: absolute; inset: 0; cursor: pointer; z-index: 5; display: none; }
-.tap.show { display: block; }
-
-@keyframes sirenPulse {
-  0%   { transform: scale(1); }
-  100% { transform: scale(1.08); }
+.resume:hover {
+    background-color: #dc2626; /* Vermelho mais escuro no hover */
 }
