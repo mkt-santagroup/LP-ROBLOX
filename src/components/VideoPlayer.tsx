@@ -39,9 +39,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         ref={videoRef}
         id="vsl-video"
         src={videoUrl}
-        poster="/thumb.png"
+        /* PUXANDO A THUMB DO BUCKET DO SUPABASE: */
+        poster="https://nfctydisrnpofyscngrx.supabase.co/storage/v1/object/public/videos-tutoriais/thumb.png"
         playsInline 
-        preload="metadata" /* <--- OTIMIZAÇÃO: Não baixa o vídeo inteiro à toa */
+        preload="metadata" 
         className={styles.video}
       ></video>
 

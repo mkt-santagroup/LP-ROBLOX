@@ -1,16 +1,15 @@
 /* src/App.module.css */
 
-/* NOVA CLASSE: Fundo que ocupa a tela toda */
 .landingWrapper {
   width: 100%;
   min-height: 100vh;
-  background: url('/background.png') center top / cover no-repeat fixed;
+  /* PUXANDO O BG DO BUCKET DO SUPABASE: */
+  background: url('https://nfctydisrnpofyscngrx.supabase.co/storage/v1/object/public/videos-tutoriais/background.png') center top / cover no-repeat fixed;
   display: flex;
   justify-content: center;
   align-items: flex-start;
 }
 
-/* CLASSE ANTIGA CORRIGIDA: Tiramos o background daqui */
 .page {
   position: relative;
   z-index: 1;
