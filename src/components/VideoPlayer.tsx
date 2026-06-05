@@ -9,6 +9,8 @@ interface VideoPlayerProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
 }
 
+const thumbnailUrl = 'https://nfctydisrnpofyscngrx.supabase.co/storage/v1/object/public/videos-tutoriais/thumb.png';
+
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({ 
   videoUrl, 
   isPlaying, 
@@ -17,21 +19,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   videoRef 
 }) => {
   const [hasStarted, setHasStarted] = useState(false);
+  const [hasEnded, setHasEnded] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
     if (isPlaying) {
       setHasStarted(true);
+      setHasEnded(false);
     }
     
     if (video) {
       if (isPlaying) {
+        if (hasEnded) {
+          video.currentTime = 0;
+        }
         video.play().catch((err) => console.warn("Erro ao dar play:", err));
       } else {
         video.pause();
       }
     }
-  }, [isPlaying, videoRef]);
+  }, [isPlaying, hasEnded, videoRef]);
+
+  const handleEnded = () => {
+    setHasEnded(true);
+    onPause();
+  };
 
   return (
     <div className={styles.player}>
@@ -39,11 +51,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         ref={videoRef}
         id="vsl-video"
         src={videoUrl}
-        /* PUXANDO A THUMB DO BUCKET DO SUPABASE: */
-        poster="https://nfctydisrnpofyscngrx.supabase.co/storage/v1/object/public/videos-tutoriais/thumb.png"
+        poster={thumbnailUrl}
         playsInline 
         preload="metadata" 
         className={styles.video}
+        onEnded={handleEnded}
       ></video>
 
       {/* Botão de Play Inicial Seguro e Personalizado */}
@@ -57,13 +69,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </button>
       )}
 
+      {hasEnded && (
+        <div className={styles.thumbnailOverlay} onClick={onPlay}>
+          <img src={thumbnailUrl} alt="Thumbnail do vídeo" className={styles.thumbnailImage} />
+          <div className={styles.replayText}>VER DE NOVO</div>
+        </div>
+      )}
+
       {/* Overlay de Pausa (Scare) */}
       {isPlaying && (
         <div className={`${styles.tap} ${styles.show}`} onClick={onPause}></div>
       )}
 
       <div 
-        className={`${styles.pauseOv} ${!isPlaying && hasStarted ? styles.show : ''}`} 
+        className={`${styles.pauseOv} ${!isPlaying && hasStarted && !hasEnded ? styles.show : ''}`} 
         onClick={onPlay}
       >
         <div className={styles.scare}>

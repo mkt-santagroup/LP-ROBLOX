@@ -109,6 +109,42 @@
   visibility: visible;
 }
 
+.thumbnailOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  padding: 16px;
+}
+
+.thumbnailImage {
+  width: 100%;
+  height: auto;
+  max-height: 70%;
+  object-fit: cover;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.replayText {
+  margin-top: 14px;
+  padding: 10px 20px;
+  background: rgba(239, 68, 68, 0.95);
+  color: white;
+  font-weight: 700;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .scare {
   text-align: center;
   color: white;
