@@ -6,6 +6,7 @@ import { CTAButton } from '../../components/CTAButton';
 import { ProgressBar } from '../../components/ProgressBar';
 import { VideoPlayer } from '../../components/VideoPlayer';
 import { getMockData } from '../../lib/supabase';
+import { getInfluencerBySlug, slugify } from '../../lib/influencers';
 import styles from '../../App.module.css';
 import { useRobloxAnalytics } from '../../hooks/useRobloxAnalytics';
 
@@ -26,8 +27,18 @@ export const LandingPage = () => {
   const { trackStartClick, trackBlockedClick, trackLinkClick } = useRobloxAnalytics(videoRef, { influencer, social });
 
   useEffect(() => {
-    getMockData().then(setData);
-  }, []);
+    let active = true;
+    (async () => {
+      const base = await getMockData();
+      // Se a rota tem influenciador cadastrado, usa o vídeo DELE
+      if (influencer) {
+        const inf = await getInfluencerBySlug(slugify(influencer));
+        if (inf?.video_url) base.videoUrl = inf.video_url;
+      }
+      if (active) setData(base);
+    })();
+    return () => { active = false; };
+  }, [influencer]);
 
   useEffect(() => {
     let interval: any;

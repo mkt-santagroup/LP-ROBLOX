@@ -49,6 +49,60 @@
   font-weight: 500;
 }
 
+/* Select de influenciador */
+.selectWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.selectIcon {
+  position: absolute;
+  left: 13px;
+  pointer-events: none;
+}
+.selectChevron {
+  position: absolute;
+  right: 12px;
+  pointer-events: none;
+}
+.influencerSelect {
+  appearance: none;
+  -webkit-appearance: none;
+  background: #16161b;
+  border: 1px solid #2a2a35;
+  border-radius: 10px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 11px 38px 11px 38px;
+  min-width: 240px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.influencerSelect:hover,
+.influencerSelect:focus { border-color: #a855f7; }
+.influencerSelect option { background: #16161b; color: #fff; }
+
+/* Botão Gerenciar */
+.manageBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: #fff;
+  border: none;
+  padding: 11px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+.manageBtn:hover { opacity: 0.92; }
+
 /* Títulos de cada fileira */
 .sectionHeader {
   display: flex;
@@ -247,6 +301,10 @@
   transition: border-color 0.2s;
 }
 .miniStat:hover { border-color: #2a2a35; }
+.miniStatHighlight {
+  background: linear-gradient(145deg, #00e5ff14 0%, #14141a 62%);
+  border-color: #00e5ff3a;
+}
 .miniStatIcon {
   width: 48px;
   height: 48px;

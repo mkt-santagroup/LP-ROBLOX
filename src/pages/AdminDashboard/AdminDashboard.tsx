@@ -1,11 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { listInfluencers, Influencer } from '../../lib/influencers';
 import styles from './AdminDashboard.module.css';
 import CustomDatePicker from './CustomDatePicker';
+import InfluencerPicker from './InfluencerPicker';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import {
   Users, Eye, Clock, PlayCircle, AlertTriangle, MousePointerClick, BarChart2,
-  Target, Smartphone, Monitor, Tablet, Trophy, Filter
+  Target, Smartphone, Monitor, Tablet, Trophy, Filter, Users2
 } from 'lucide-react';
 
 const KpiCard = ({ title, value, subtitle, icon: Icon, color = "#a855f7", highlight = false }: any) => (
@@ -39,8 +42,17 @@ const DEVICE_META: Record<string, { label: string; color: string; icon: any }> =
 };
 
 export default function AdminDashboard() {
-  const [data, setData] = useState<any[]>([]);
+  const [allData, setAllData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filtro por influenciador ('all' = todos)
+  const [influencers, setInfluencers] = useState<Influencer[]>([]);
+  const [selectedInfluencer, setSelectedInfluencer] = useState<string>('all');
+
+  // Dados já filtrados pelo influenciador escolhido (alimenta todas as métricas abaixo)
+  const data = selectedInfluencer === 'all'
+    ? allData
+    : allData.filter(d => (d.influencer || '').toLowerCase() === selectedInfluencer);
 
   const [dateRange, setDateRange] = useState<{start: Date, end: Date}>(() => {
     const now = new Date();
@@ -62,7 +74,7 @@ export default function AdminDashboard() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setData(result || []);
+      setAllData(result || []);
     } catch (err) {
       console.error("Erro ao buscar dados:", err);
     } finally {
@@ -73,6 +85,21 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchData(dateRange.start, dateRange.end);
   }, [fetchData, dateRange]);
+
+  useEffect(() => {
+    listInfluencers().then(setInfluencers);
+  }, []);
+
+  // Opções do filtro: cadastrados + quaisquer slugs que apareçam nos dados
+  const influencerOptions = (() => {
+    const map = new Map<string, string>(); // slug -> nome exibido
+    influencers.forEach(inf => map.set(inf.slug, inf.name));
+    allData.forEach(d => {
+      const slug = (d.influencer || '').toLowerCase().trim();
+      if (slug && !map.has(slug)) map.set(slug, slug);
+    });
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  })();
 
   const handleRangeChange = (start: Date, end: Date) => {
     setDateRange({ start, end });
@@ -162,8 +189,22 @@ export default function AdminDashboard() {
         </div>
         <div className={styles.controlsArea}>
           <div className={styles.inputGroup}>
+            <label>Influenciador</label>
+            <InfluencerPicker
+              value={selectedInfluencer}
+              onChange={setSelectedInfluencer}
+              options={influencerOptions.map(([slug, name]) => ({ value: slug, label: name, slug }))}
+            />
+          </div>
+          <div className={styles.inputGroup}>
             <label>Período de Análise</label>
             <CustomDatePicker onRangeChange={handleRangeChange} />
+          </div>
+          <div className={styles.inputGroup}>
+            <label>&nbsp;</label>
+            <Link to="/admin/influenciadores" className={styles.manageBtn}>
+              <Users2 size={16} /> Gerenciar
+            </Link>
           </div>
         </div>
       </header>
@@ -181,12 +222,11 @@ export default function AdminDashboard() {
           color="#a855f7"
         />
         <KpiCard
-          title="TAXA DE CONVERSÃO GERAL"
-          value={`${conversaoGeral}%`}
-          subtitle="Acessos que entraram no jogo"
-          icon={Target}
-          color="#00e5ff"
-          highlight
+          title="TOTAL DE VIEWS"
+          value={totalViews.toLocaleString('pt-BR')}
+          subtitle="Soma de visualizações da página"
+          icon={Eye}
+          color="#3b82f6"
         />
         <KpiCard
           title="INICIARAM O VÍDEO"
@@ -196,16 +236,25 @@ export default function AdminDashboard() {
           color="#22c55e"
         />
         <KpiCard
-          title="FORAM PRO LINK"
-          value={foramProLink.toLocaleString('pt-BR')}
-          subtitle={`${linkRate}% de quem deu play`}
-          icon={MousePointerClick}
-          color="#f59e0b"
+          title="CLIQUES NA ESPERA"
+          value={totalCliquesEspera.toLocaleString('pt-BR')}
+          subtitle={`${esperaRate}% de quem deu play se frustrou`}
+          icon={AlertTriangle}
+          color="#ef4444"
         />
       </div>
 
-      {/* FILEIRA 1.5: Stats secundários */}
+      {/* FILEIRA 1.5: Stats secundários (Foram pro Link, Tempo médio, Conversão geral) */}
       <div className={styles.secondaryStrip}>
+        <div className={styles.miniStat}>
+          <div className={styles.miniStatIcon} style={{ backgroundColor: '#f59e0b19' }}>
+            <MousePointerClick size={22} color="#f59e0b" />
+          </div>
+          <div>
+            <div className={styles.miniStatValue}>{foramProLink.toLocaleString('pt-BR')}</div>
+            <div className={styles.miniStatLabel}>Foram pro link ({linkRate}% de quem deu play)</div>
+          </div>
+        </div>
         <div className={styles.miniStat}>
           <div className={styles.miniStatIcon} style={{ backgroundColor: '#10b98119' }}>
             <Clock size={22} color="#10b981" />
@@ -215,22 +264,13 @@ export default function AdminDashboard() {
             <div className={styles.miniStatLabel}>Tempo médio assistido (quem deu play)</div>
           </div>
         </div>
-        <div className={styles.miniStat}>
-          <div className={styles.miniStatIcon} style={{ backgroundColor: '#ef444419' }}>
-            <AlertTriangle size={22} color="#ef4444" />
+        <div className={`${styles.miniStat} ${styles.miniStatHighlight}`}>
+          <div className={styles.miniStatIcon} style={{ backgroundColor: '#00e5ff19' }}>
+            <Target size={22} color="#00e5ff" />
           </div>
           <div>
-            <div className={styles.miniStatValue}>{totalCliquesEspera.toLocaleString('pt-BR')}</div>
-            <div className={styles.miniStatLabel}>Cliques na espera ({esperaRate}% se frustraram)</div>
-          </div>
-        </div>
-        <div className={styles.miniStat}>
-          <div className={styles.miniStatIcon} style={{ backgroundColor: '#3b82f619' }}>
-            <Eye size={22} color="#3b82f6" />
-          </div>
-          <div>
-            <div className={styles.miniStatValue}>{totalViews.toLocaleString('pt-BR')}</div>
-            <div className={styles.miniStatLabel}>Total de visualizações da página</div>
+            <div className={styles.miniStatValue} style={{ color: '#00e5ff' }}>{conversaoGeral}%</div>
+            <div className={styles.miniStatLabel}>Conversão geral — acessos que entraram no jogo</div>
           </div>
         </div>
       </div>

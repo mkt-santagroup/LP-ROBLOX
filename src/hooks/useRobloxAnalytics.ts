@@ -1,5 +1,6 @@
 import { useEffect, useRef, RefObject } from 'react';
 import { supabase } from '../lib/supabase';
+import { slugify } from '../lib/influencers';
 
 // Declarar as variáveis globais do Meta e GTM pro TypeScript não reclamar
 declare global {
@@ -48,7 +49,8 @@ export function useRobloxAnalytics(
     return trimmed.length > 0 ? trimmed : null;
   };
 
-  const influencer = cleanSlug(origin?.influencer);
+  // Slug do influenciador padronizado (igual ao cadastro): "Nathan" -> "nathan"
+  const influencer = origin?.influencer ? (slugify(origin.influencer) || null) : null;
   // Rede social padronizada em minúsculo (instagram, tiktok, youtube...)
   const social = cleanSlug(origin?.social)?.toLowerCase() ?? null;
 

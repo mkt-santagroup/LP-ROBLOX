@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { LandingPage } from './pages/LandingPage';
 import AdminDashboard from './pages/AdminDashboard/AdminDashboard';
+import InfluencerManager from './pages/AdminDashboard/InfluencerManager';
 
 export default function App() {
   return (
@@ -11,6 +12,9 @@ export default function App() {
 
         {/* Rota do Admin: O Dashboard de Métricas */}
         <Route path="/admin" element={<AdminDashboard />} />
+
+        {/* Gestão de Influenciadores */}
+        <Route path="/admin/influenciadores" element={<InfluencerManager />} />
 
         {/* Rotas de origem: /influenciador e /influenciador/rede-social
             Renderizam a mesma LP, mas capturam de onde veio o tráfego.
