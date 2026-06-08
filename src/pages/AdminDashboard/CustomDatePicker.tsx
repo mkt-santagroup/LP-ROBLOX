@@ -14,12 +14,15 @@ interface DatePickerProps {
 export default function CustomDatePicker({ onRangeChange }: DatePickerProps) {
   const today = new Date();
 
-  // Estado inicial: Este Mês
-  const initialStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  // Data base para o filtro "Tudo" (período completo)
+  const ALL_TIME_START = new Date(2020, 0, 1);
+
+  // Estado inicial: Tudo (mostra todo o histórico ao abrir)
+  const initialStart = ALL_TIME_START;
   const initialEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
 
   const [isOpen, setIsOpen] = useState(false);
-  const [activeQuick, setActiveQuick] = useState<string>('mes');
+  const [activeQuick, setActiveQuick] = useState<string>('tudo');
 
   // Datas confirmadas (exibidas no botão e no calendário)
   const [startDate, setStartDate] = useState<Date>(initialStart);
@@ -51,7 +54,9 @@ export default function CustomDatePicker({ onRangeChange }: DatePickerProps) {
     let start: Date;
     const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
-    if (filter === 'hoje') {
+    if (filter === 'tudo') {
+      start = ALL_TIME_START;
+    } else if (filter === 'hoje') {
       start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     } else if (filter === 'mes') {
       start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -163,6 +168,7 @@ export default function CustomDatePicker({ onRangeChange }: DatePickerProps) {
   const formatDateRange = () => {
     const fmt = (d: Date) => d.toLocaleDateString('pt-BR');
     if (pendingStart) return `${fmt(pendingStart)} - selecione o fim`;
+    if (activeQuick === 'tudo') return 'Todo o período';
     return `${fmt(startDate)} - ${fmt(endDate)}`;
   };
 
@@ -179,6 +185,7 @@ export default function CustomDatePicker({ onRangeChange }: DatePickerProps) {
       {isOpen && (
         <div className={styles.popover}>
           <div className={styles.quickFilters}>
+            <button className={`${styles.quickBtn} ${activeQuick === 'tudo' ? styles.active : ''}`} onClick={() => applyQuickFilter('tudo')}>Tudo</button>
             <button className={`${styles.quickBtn} ${activeQuick === 'hoje' ? styles.active : ''}`} onClick={() => applyQuickFilter('hoje')}>Hoje</button>
             <button className={`${styles.quickBtn} ${activeQuick === 'mes' ? styles.active : ''}`} onClick={() => applyQuickFilter('mes')}>Este Mês</button>
             <button className={`${styles.quickBtn} ${activeQuick === '7d' ? styles.active : ''}`} onClick={() => applyQuickFilter('7d')}>Últ. 7 dias</button>

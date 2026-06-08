@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import { Clouds } from '../../components/Clouds';
 import { Header } from '../../components/Header';
 import { CTAButton } from '../../components/CTAButton';
@@ -19,7 +20,10 @@ export const LandingPage = () => {
   const [label, setLabel] = useState('QUERO JOGAR!');
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const { trackStartClick, trackBlockedClick, trackLinkClick } = useRobloxAnalytics(videoRef);
+
+  // Captura a origem do tráfego da URL: /:influencer/:social
+  const { influencer, social } = useParams();
+  const { trackStartClick, trackBlockedClick, trackLinkClick } = useRobloxAnalytics(videoRef, { influencer, social });
 
   useEffect(() => {
     getMockData().then(setData);

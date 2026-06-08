@@ -9,7 +9,15 @@ declare global {
   }
 }
 
-export function useRobloxAnalytics(videoRef: RefObject<HTMLVideoElement | null>) {
+interface TrackingOrigin {
+  influencer?: string;
+  social?: string;
+}
+
+export function useRobloxAnalytics(
+  videoRef: RefObject<HTMLVideoElement | null>,
+  origin?: TrackingOrigin
+) {
   const visitorId = useRef<string>('');
   const clickCalmaCount = useRef<number>(0);
   const highestExactProgress = useRef<number>(0);
@@ -27,6 +35,22 @@ export function useRobloxAnalytics(videoRef: RefObject<HTMLVideoElement | null>)
     if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(ua)) return "mobile";
     return "desktop";
   };
+
+  // Normaliza os pedaços da URL (/influenciador/rede-social) que vêm da rota
+  const cleanSlug = (value?: string) => {
+    if (!value) return null;
+    try {
+      value = decodeURIComponent(value);
+    } catch {
+      // se vier um % quebrado, segue com o valor original
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  };
+
+  const influencer = cleanSlug(origin?.influencer);
+  // Rede social padronizada em minúsculo (instagram, tiktok, youtube...)
+  const social = cleanSlug(origin?.social)?.toLowerCase() ?? null;
 
   const updateSession = async (dataToUpdate: any) => {
     if (!visitorId.current) return;
@@ -64,22 +88,34 @@ export function useRobloxAnalytics(videoRef: RefObject<HTMLVideoElement | null>)
       const { data } = await supabase.from('lp_roblox').select('*').eq('visitor_id', currentVisitorId).maybeSingle();
       
       if (!data) {
-        await supabase.from('lp_roblox').insert([{ 
-          visitor_id: currentVisitorId, 
+        await supabase.from('lp_roblox').insert([{
+          visitor_id: currentVisitorId,
           page_views: 1,
           ip_address: userIp,
-          device_type: deviceType
+          device_type: deviceType,
+          // Origem do tráfego capturada da URL (/influenciador/rede-social)
+          influencer: influencer,
+          social_network: social
         }]);
+        if (influencer) {
+          console.log(`%c[TRACKING] Origem: ${influencer}${social ? ` / ${social}` : ''}`, "color: #a855f7; font-weight: bold;");
+        }
       } else {
         clickCalmaCount.current = data.click_calma || 0;
         highestExactProgress.current = data.exact_percentage_viewed || 0;
         highestMaxProgress.current = data.max_percentage_viewed || 0;
 
-        await updateSession({ 
+        const updatePayload: any = {
           page_views: (data.page_views || 0) + 1,
           ip_address: userIp,
           device_type: deviceType
-        });
+        };
+
+        // First-touch: só grava a origem se ainda não houver uma salva para esse visitante
+        if (influencer && !data.influencer) updatePayload.influencer = influencer;
+        if (social && !data.social_network) updatePayload.social_network = social;
+
+        await updateSession(updatePayload);
       }
     };
 

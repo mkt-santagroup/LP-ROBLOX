@@ -2,34 +2,51 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import styles from './AdminDashboard.module.css';
 import CustomDatePicker from './CustomDatePicker';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Users, Eye, Clock, PlayCircle, AlertTriangle, MousePointerClick, BarChart2 } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import {
+  Users, Eye, Clock, PlayCircle, AlertTriangle, MousePointerClick, BarChart2,
+  Target, Smartphone, Monitor, Tablet, Trophy, Filter
+} from 'lucide-react';
 
-const KpiCard = ({ title, value, subtitle, icon: Icon, color = "#a855f7" }: any) => (
-  <div className={styles.kpiCard}>
+const KpiCard = ({ title, value, subtitle, icon: Icon, color = "#a855f7", highlight = false }: any) => (
+  <div
+    className={styles.kpiCard}
+    style={{
+      background: `linear-gradient(145deg, ${color}${highlight ? '24' : '14'} 0%, #14141a 62%)`,
+      borderColor: `${color}${highlight ? '66' : '30'}`,
+    }}
+  >
+    <div className={styles.kpiAccent} style={{ background: color }} />
     <div className={styles.kpiTop}>
       <div>
         <div className={styles.kpiTitle}>{title}</div>
-        <div className={styles.kpiValue}>{value}</div>
+        <div className={styles.kpiValue} style={{ color: highlight ? color : '#fff' }}>{value}</div>
       </div>
-      <div className={styles.kpiIcon} style={{ backgroundColor: `${color}1A` }}>
+      <div className={styles.kpiIcon} style={{ backgroundColor: `${color}22` }}>
         <Icon size={24} color={color} />
       </div>
     </div>
-    <div className={styles.kpiBottom}>
-      {subtitle && <div className={styles.kpiCompare}>{subtitle}</div>}
-    </div>
+    {subtitle && <div className={styles.kpiCompare}>{subtitle}</div>}
   </div>
 );
+
+// Cores de cada dispositivo no donut
+const DEVICE_META: Record<string, { label: string; color: string; icon: any }> = {
+  desktop: { label: 'Desktop', color: '#a855f7', icon: Monitor },
+  mobile: { label: 'Mobile', color: '#7c3aed', icon: Smartphone },
+  tablet: { label: 'Tablet', color: '#c084fc', icon: Tablet },
+  outros: { label: 'Outros', color: '#6b7280', icon: Eye },
+};
 
 export default function AdminDashboard() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   const [dateRange, setDateRange] = useState<{start: Date, end: Date}>(() => {
     const now = new Date();
     return {
-      start: new Date(now.getFullYear(), now.getMonth(), 1),
+      // Padrão "Tudo": pega todo o histórico e o usuário filtra se quiser
+      start: new Date(2020, 0, 1),
       end: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
     };
   });
@@ -63,34 +80,28 @@ export default function AdminDashboard() {
 
   // --- CÁLCULOS ROBLOX ---
   const uniqueUsers = data.length;
-  const totalViews = data.reduce((acc, curr) => acc + (curr.page_views || 1), 0); 
-  
+  const totalViews = data.reduce((acc, curr) => acc + (curr.page_views || 1), 0);
+
   const playsData = data.filter(d => d.click_start);
   const plays = playsData.length;
-  
-  const avgTime = plays > 0 
-    ? (playsData.reduce((acc, curr) => acc + Number(curr.exact_percentage_viewed || 0), 0) / plays).toFixed(1) 
+
+  const avgTime = plays > 0
+    ? (playsData.reduce((acc, curr) => acc + Number(curr.exact_percentage_viewed || 0), 0) / plays).toFixed(1)
     : "0.0";
 
   const iniciaramVideo = plays;
   const iniciaramVideoRate = uniqueUsers > 0 ? ((iniciaramVideo / uniqueUsers) * 100).toFixed(1) : "0.0";
 
-  // SOMA TOTAL DE CLIQUES NA ESPERA (O que você pediu!)
+  // SOMA TOTAL DE CLIQUES NA ESPERA
   const totalCliquesEspera = data.reduce((acc, curr) => acc + Number(curr.click_calma || 0), 0);
-  
-  // Taxa de usuários únicos que clicaram na espera (para o subtítulo)
   const usersClicaramEspera = data.filter(d => Number(d.click_calma || 0) > 0).length;
   const esperaRate = iniciaramVideo > 0 ? ((usersClicaramEspera / iniciaramVideo) * 100).toFixed(1) : "0.0";
 
   const foramProLink = data.filter(d => d.click_link).length;
   const linkRate = iniciaramVideo > 0 ? ((foramProLink / iniciaramVideo) * 100).toFixed(1) : "0.0";
 
-  // Marcos (Engajamento)
-  const milestoneData = [25, 50, 75, 95, 100].map(pct => {
-    const usuarios = data.filter(d => Number(d.max_percentage_viewed || 0) >= pct).length;
-    const rate = plays > 0 ? ((usuarios / plays) * 100).toFixed(1) : "0.0";
-    return { name: `VIRAM ${pct}%`, usuarios, rate };
-  });
+  // MÉTRICA-HERÓI: conversão geral (acesso -> entrou no jogo)
+  const conversaoGeral = uniqueUsers > 0 ? ((foramProLink / uniqueUsers) * 100).toFixed(1) : "0.0";
 
   // Gráfico de Retenção
   const chartData = Array.from({ length: 101 }, (_, index) => ({
@@ -98,11 +109,55 @@ export default function AdminDashboard() {
     users: playsData.filter(row => Number(row.exact_percentage_viewed || 0) >= index).length
   }));
 
+  // --- FUNIL DE RETENÇÃO DO VÍDEO (quanto cada pessoa assistiu) ---
+  const countAtLeast = (pct: number) => data.filter(d => Number(d.max_percentage_viewed || 0) >= pct).length;
+  const funnelStages = [
+    { label: 'Deram Play', value: plays, color: '#3b82f6', icon: PlayCircle },
+    { label: 'Viram 25%', value: countAtLeast(25), color: '#06b6d4', icon: Eye },
+    { label: 'Viram 50%', value: countAtLeast(50), color: '#10b981', icon: Eye },
+    { label: 'Viram 75%', value: countAtLeast(75), color: '#22c55e', icon: Eye },
+    { label: 'Viram 95%', value: countAtLeast(95), color: '#84cc16', icon: Eye },
+    { label: 'Assistiram 100%', value: countAtLeast(100), color: '#f59e0b', icon: Trophy },
+  ];
+  const funnelTop = funnelStages[0].value || 1;
+
+  // --- DISPOSITIVOS ---
+  const deviceCounts = data.reduce((acc: Record<string, number>, row) => {
+    const raw = (row.device_type || 'outros').toLowerCase();
+    const key = DEVICE_META[raw] ? raw : 'outros';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const deviceData = Object.entries(deviceCounts)
+    .map(([key, value]) => ({ key, value: value as number, ...DEVICE_META[key] }))
+    .sort((a, b) => b.value - a.value);
+
+  // --- ORIGEM / INFLUENCIADORES ---
+  const originGroups: any[] = Object.values(
+    data.reduce((acc: Record<string, any>, row) => {
+      const inf = (row.influencer || '').trim();
+      if (!inf) return acc; // ignora acessos diretos (sem origem)
+      const social = (row.social_network || '').trim().toLowerCase();
+      const key = `${inf.toLowerCase()}|${social}`;
+
+      if (!acc[key]) {
+        acc[key] = { influencer: inf, social: social, users: 0, plays: 0, links: 0 };
+      }
+      acc[key].users += 1;
+      if (row.click_start) acc[key].plays += 1;
+      if (row.click_link) acc[key].links += 1;
+      return acc;
+    }, {})
+  ).sort((a: any, b: any) => b.users - a.users);
+
+  const acessosDiretos = data.filter(d => !(d.influencer || '').trim()).length;
+  const topOriginUsers = originGroups.length > 0 ? (originGroups[0] as any).users : 1;
+
   return (
     <div className={styles.container}>
       <header className={styles.header}>
         <div className={styles.titleArea}>
-          <h1>Roblox Analytics </h1>
+          <h1>Roblox Analytics</h1>
           <p>Métricas reais de engajamento e conversão da Landing Page.</p>
         </div>
         <div className={styles.controlsArea}>
@@ -113,48 +168,32 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {/* FILEIRA 1: Visão Geral */}
+      {loading && <div className={styles.loadingBar}><span /></div>}
+
+      {/* FILEIRA 1: Visão Geral + Conversão Herói */}
       <h2 className={styles.sectionHeader}>VISÃO GERAL</h2>
       <div className={styles.kpiGrid}>
         <KpiCard
           title="USUÁRIOS ÚNICOS"
           value={uniqueUsers.toLocaleString('pt-BR')}
-          subtitle="Baseado em visitor_id"
+          subtitle="Visitantes únicos (visitor_id)"
           icon={Users}
           color="#a855f7"
         />
         <KpiCard
-          title="PAGE VIEWS (TOTAL)"
-          value={totalViews.toLocaleString('pt-BR')}
-          subtitle="Soma de visualizações da página"
-          icon={Eye}
-          color="#3b82f6"
+          title="TAXA DE CONVERSÃO GERAL"
+          value={`${conversaoGeral}%`}
+          subtitle="Acessos que entraram no jogo"
+          icon={Target}
+          color="#00e5ff"
+          highlight
         />
-        <KpiCard
-          title="TEMPO MÉDIO DE VISUALIZ."
-          value={`${avgTime}%`}
-          subtitle="Média apenas de quem deu play"
-          icon={Clock}
-          color="#10b981"
-        />
-      </div>
-
-      {/* FILEIRA 2: Funil */}
-      <h2 className={styles.sectionHeader}>FUNIL DE CONVERSÃO</h2>
-      <div className={styles.kpiGrid}>
         <KpiCard
           title="INICIARAM O VÍDEO"
           value={iniciaramVideo.toLocaleString('pt-BR')}
           subtitle={`${iniciaramVideoRate}% dos acessos únicos`}
           icon={PlayCircle}
           color="#22c55e"
-        />
-        <KpiCard
-          title="CLICARAM NA ESPERA"
-          value={totalCliquesEspera.toLocaleString('pt-BR')}
-          subtitle={`${esperaRate}% de quem deu play clicou`}
-          icon={AlertTriangle}
-          color="#ef4444"
         />
         <KpiCard
           title="FORAM PRO LINK"
@@ -165,44 +204,98 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* FILEIRA 3: Engajamento no Vídeo */}
-      <h2 className={styles.sectionHeader}>ENGAJAMENTO NO VÍDEO</h2>
-      <div className={styles.milestoneGrid}>
-        <div className={styles.milestoneCard}>
-          <div className={styles.milestoneTitle}>TOTAL DE PLAYS</div>
-          <div className={styles.milestoneValue}>{plays}</div>
-          <div className={styles.milestoneRate}>
-            {iniciaramVideoRate}% dos únicos
+      {/* FILEIRA 1.5: Stats secundários */}
+      <div className={styles.secondaryStrip}>
+        <div className={styles.miniStat}>
+          <div className={styles.miniStatIcon} style={{ backgroundColor: '#10b98119' }}>
+            <Clock size={22} color="#10b981" />
+          </div>
+          <div>
+            <div className={styles.miniStatValue}>{avgTime}%</div>
+            <div className={styles.miniStatLabel}>Tempo médio assistido (quem deu play)</div>
           </div>
         </div>
-        {milestoneData.map((item, index) => (
-          <div key={index} className={styles.milestoneCard}>
-            <div className={styles.milestoneTitle}>{item.name}</div>
-            <div className={styles.milestoneValue}>{item.usuarios}</div>
-            <div className={styles.milestoneRate}>
-              {item.rate}% dos plays
-            </div>
+        <div className={styles.miniStat}>
+          <div className={styles.miniStatIcon} style={{ backgroundColor: '#ef444419' }}>
+            <AlertTriangle size={22} color="#ef4444" />
           </div>
-        ))}
+          <div>
+            <div className={styles.miniStatValue}>{totalCliquesEspera.toLocaleString('pt-BR')}</div>
+            <div className={styles.miniStatLabel}>Cliques na espera ({esperaRate}% se frustraram)</div>
+          </div>
+        </div>
+        <div className={styles.miniStat}>
+          <div className={styles.miniStatIcon} style={{ backgroundColor: '#3b82f619' }}>
+            <Eye size={22} color="#3b82f6" />
+          </div>
+          <div>
+            <div className={styles.miniStatValue}>{totalViews.toLocaleString('pt-BR')}</div>
+            <div className={styles.miniStatLabel}>Total de visualizações da página</div>
+          </div>
+        </div>
       </div>
 
-      {/* FILEIRA 4: Gráfico */}
-      <div className={styles.mainGrid}>
+      {/* FILEIRA 2: Funil de Retenção (verde) + Curva de Retenção (vermelha) lado a lado */}
+      <h2 className={styles.sectionHeader}>RETENÇÃO DO VÍDEO</h2>
+      <div className={styles.funnelChartGrid}>
+        {/* FUNIL (verde) */}
+        <div className={styles.panel}>
+          <div className={styles.cardTitle}>
+            <Filter size={20} color="#22c55e" />
+            Funil de Retenção do Vídeo
+          </div>
+          <p className={styles.panelSub}>Quanto do vídeo cada pessoa que deu play assistiu</p>
+          <div className={styles.funnel}>
+            {funnelStages.map((stage, i) => {
+              const widthPct = Math.max((stage.value / funnelTop) * 100, 4);
+              const prev = i > 0 ? funnelStages[i - 1].value : stage.value;
+              const ofPrev = prev > 0 ? (stage.value / prev) * 100 : 0;
+              const ofTotal = funnelTop > 0 ? (stage.value / funnelTop) * 100 : 0;
+              const drop = i > 0 ? (100 - ofPrev) : 0;
+              const StageIcon = stage.icon;
+              return (
+                <div key={i} className={styles.funnelRow}>
+                  <div className={styles.funnelInfo}>
+                    <StageIcon size={15} color={stage.color} />
+                    <span className={styles.funnelLabel}>{stage.label}</span>
+                    {i > 0 && drop > 0 && (
+                      <span className={styles.funnelDrop}>↓ {drop.toFixed(0)}% de queda</span>
+                    )}
+                  </div>
+                  <div className={styles.funnelBarTrack}>
+                    <div
+                      className={styles.funnelBar}
+                      style={{ width: `${widthPct}%`, background: `linear-gradient(90deg, ${stage.color}cc, ${stage.color})` }}
+                    >
+                      <span className={styles.funnelValue}>{stage.value.toLocaleString('pt-BR')}</span>
+                    </div>
+                    <span className={styles.funnelPct}>{ofTotal.toFixed(0)}% dos plays</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* CURVA DE RETENÇÃO (vermelha) */}
         <div className={styles.chartCard}>
           <div className={styles.cardHeader}>
             <div className={styles.cardTitle}>
-              <BarChart2 size={20} color="#a855f7" />
-              Retenção do Vídeo — apenas quem deu play (0 a 100%)
+              <BarChart2 size={20} color="#ef4444" />
+              Curva de Retenção
             </div>
           </div>
+          <p className={styles.panelSub} style={{ marginTop: '-12px', marginBottom: '8px' }}>
+            Quantos espectadores ainda estavam assistindo em cada ponto do vídeo
+          </p>
           <div className={styles.chartWrapper} style={{ position: 'relative' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#a855f7" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2a2a35" />
@@ -210,17 +303,124 @@ export default function AdminDashboard() {
                   <YAxis stroke="#8b8b93" fontSize={12} tickLine={false} axisLine={false} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#16161b', borderColor: '#2a2a35', color: '#fff', borderRadius: '8px' }}
-                    itemStyle={{ color: '#00e5ff', fontWeight: 'bold' }}
+                    itemStyle={{ color: '#f87171', fontWeight: 'bold' }}
                     labelStyle={{ color: '#8b8b93', marginBottom: '4px' }}
                     formatter={(value: any) => [`${value} espectadores`, 'Audiência']}
                     labelFormatter={(label) => `Chegaram em ${label}% do vídeo`}
                   />
-                  <Area type="monotone" dataKey="users" stroke="#a855f7" strokeWidth={3} fillOpacity={1} fill="url(#colorUsers)" activeDot={{ r: 6, fill: "#fff", stroke: "#a855f7", strokeWidth: 2 }} />
+                  <Area type="monotone" dataKey="users" stroke="#ef4444" strokeWidth={3} fillOpacity={1} fill="url(#colorUsers)" activeDot={{ r: 6, fill: "#fff", stroke: "#ef4444", strokeWidth: 2 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* FILEIRA 3: Dispositivos (roxo) full-width */}
+      <h2 className={styles.sectionHeader}>ENTRADAS POR DISPOSITIVO</h2>
+      <div className={styles.panel}>
+        {uniqueUsers === 0 ? (
+          <div className={styles.emptyMini}>Sem dados no período.</div>
+        ) : (
+          <div className={styles.deviceRow}>
+            <div className={styles.donutWrap}>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={deviceData}
+                    dataKey="value"
+                    nameKey="label"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={58}
+                    outerRadius={90}
+                    paddingAngle={3}
+                    stroke="none"
+                  >
+                    {deviceData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#16161b', borderColor: '#2a2a35', color: '#fff', borderRadius: '8px' }}
+                    formatter={(value: any, name: any) => [`${value} usuários`, name]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className={styles.donutCenter}>
+                <div className={styles.donutCenterValue}>{uniqueUsers}</div>
+                <div className={styles.donutCenterLabel}>usuários</div>
+              </div>
+            </div>
+            <div className={styles.deviceBars}>
+              {deviceData.map((d, i) => {
+                const pct = uniqueUsers > 0 ? Math.round((d.value / uniqueUsers) * 100) : 0;
+                const DIcon = d.icon;
+                return (
+                  <div key={i} className={styles.deviceBarRow}>
+                    <div className={styles.deviceBarIcon} style={{ backgroundColor: `${d.color}1A` }}>
+                      <DIcon size={18} color={d.color} />
+                    </div>
+                    <div className={styles.deviceBarLabel}>
+                      <span className={styles.deviceBarName}>{d.label}</span>
+                      <span className={styles.deviceBarCount}>{d.value} usuários</span>
+                    </div>
+                    <div className={styles.deviceBarTrack}>
+                      <div className={styles.deviceBarFill} style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${d.color}aa, ${d.color})` }} />
+                    </div>
+                    <span className={styles.deviceBarPct} style={{ color: d.color }}>{pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* FILEIRA 4: Ranking de Influenciadores */}
+      <h2 className={styles.sectionHeader}>
+        ORIGEM DO TRÁFEGO — RANKING DE INFLUENCIADORES
+      </h2>
+      <div className={styles.panel}>
+        <div className={styles.originSummary}>
+          <span><strong>{originGroups.length}</strong> origem(ns) rastreada(s)</span>
+          <span><strong>{acessosDiretos}</strong> acesso(s) direto(s) (sem link)</span>
+        </div>
+        {originGroups.length === 0 ? (
+          <div className={styles.originEmpty}>
+            Nenhuma origem rastreada ainda. Use links no formato
+            <code> /nome-do-influenciador/rede-social</code> para começar a rastrear.
+          </div>
+        ) : (
+          <div className={styles.ranking}>
+            {originGroups.map((g: any, i: number) => {
+              const conv = g.users > 0 ? ((g.links / g.users) * 100).toFixed(1) : "0.0";
+              const barWidth = Math.max((g.users / topOriginUsers) * 100, 6);
+              const isTop = i === 0;
+              return (
+                <div key={i} className={styles.rankRow}>
+                  <div className={`${styles.rankPos} ${isTop ? styles.rankPosTop : ''}`}>
+                    {isTop ? <Trophy size={16} /> : `#${i + 1}`}
+                  </div>
+                  <div className={styles.rankMain}>
+                    <div className={styles.rankHead}>
+                      <span className={styles.rankName}>{g.influencer}</span>
+                      {g.social && <span className={styles.socialTag}>{g.social}</span>}
+                      <span className={styles.rankSpacer} />
+                      <span className={styles.rankUsers}>{g.users.toLocaleString('pt-BR')} usuários</span>
+                    </div>
+                    <div className={styles.rankBarTrack}>
+                      <div className={styles.rankBar} style={{ width: `${barWidth}%` }} />
+                    </div>
+                    <div className={styles.rankMeta}>
+                      <span>▶ {g.plays} plays</span>
+                      <span>🔗 {g.links} foram pro link</span>
+                      <span className={styles.rankConv}>{conv}% conversão</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
