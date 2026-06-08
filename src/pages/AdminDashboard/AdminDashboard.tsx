@@ -41,6 +41,15 @@ const DEVICE_META: Record<string, { label: string; color: string; icon: any }> =
   outros: { label: 'Outros', color: '#6b7280', icon: Eye },
 };
 
+// Cor (da marca) de cada rede social no ranking de influenciadores
+const SOCIAL_COLOR: Record<string, string> = {
+  instagram: '#e1306c', tiktok: '#25f4ee', youtube: '#ff0000', facebook: '#1877f2',
+  twitter: '#1da1f2', x: '#1da1f2', kwai: '#ff7a00', whatsapp: '#25d366',
+  telegram: '#0088cc', twitch: '#9146ff', discord: '#5865f2', direto: '#8b8b93',
+};
+const socialLabel = (name: string) =>
+  name === 'direto' ? 'Direto (sem rede)' : name.charAt(0).toUpperCase() + name.slice(1);
+
 export default function AdminDashboard() {
   const [allData, setAllData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,6 +154,7 @@ export default function AdminDashboard() {
     { label: 'Viram 75%', value: countAtLeast(75), color: '#22c55e', icon: Eye },
     { label: 'Viram 95%', value: countAtLeast(95), color: '#84cc16', icon: Eye },
     { label: 'Assistiram 100%', value: countAtLeast(100), color: '#f59e0b', icon: Trophy },
+    { label: 'Clicaram no Link', value: foramProLink, color: '#ec4899', icon: MousePointerClick },
   ];
   const funnelTop = funnelStages[0].value || 1;
 
@@ -160,25 +170,39 @@ export default function AdminDashboard() {
     .sort((a, b) => b.value - a.value);
 
   // --- ORIGEM / INFLUENCIADORES ---
-  const originGroups: any[] = Object.values(
-    data.reduce((acc: Record<string, any>, row) => {
-      const inf = (row.influencer || '').trim();
-      if (!inf) return acc; // ignora acessos diretos (sem origem)
-      const social = (row.social_network || '').trim().toLowerCase();
-      const key = `${inf.toLowerCase()}|${social}`;
+  // Agrupa por influenciador e, dentro dele, quebra por rede social (uma linha por rede)
+  const influencerMap = data.reduce((acc: Record<string, any>, row) => {
+    const inf = (row.influencer || '').trim();
+    if (!inf) return acc; // ignora acessos diretos (sem origem)
+    const key = inf.toLowerCase();
+    if (!acc[key]) {
+      acc[key] = { influencer: inf, users: 0, plays: 0, links: 0, socials: {} as Record<string, any> };
+    }
+    const g = acc[key];
+    g.users += 1;
+    if (row.click_start) g.plays += 1;
+    if (row.click_link) g.links += 1;
 
-      if (!acc[key]) {
-        acc[key] = { influencer: inf, social: social, users: 0, plays: 0, links: 0 };
-      }
-      acc[key].users += 1;
-      if (row.click_start) acc[key].plays += 1;
-      if (row.click_link) acc[key].links += 1;
-      return acc;
-    }, {})
-  ).sort((a: any, b: any) => b.users - a.users);
+    // Rede social (vazio = "direto", quando entrou só com /influenciador sem rede)
+    const social = (row.social_network || '').trim().toLowerCase() || 'direto';
+    if (!g.socials[social]) g.socials[social] = { users: 0, plays: 0, links: 0 };
+    g.socials[social].users += 1;
+    if (row.click_start) g.socials[social].plays += 1;
+    if (row.click_link) g.socials[social].links += 1;
+    return acc;
+  }, {});
+
+  const originGroups: any[] = Object.values(influencerMap)
+    .map((g: any) => ({
+      ...g,
+      socialList: Object.entries(g.socials)
+        .map(([name, v]: [string, any]) => ({ name, ...v }))
+        .sort((a, b) => b.users - a.users),
+    }))
+    .sort((a: any, b: any) => b.users - a.users);
 
   const acessosDiretos = data.filter(d => !(d.influencer || '').trim()).length;
-  const topOriginUsers = originGroups.length > 0 ? (originGroups[0] as any).users : 1;
+  const topOriginUsers = originGroups.length > 0 ? originGroups[0].users : 1;
 
   return (
     <div className={styles.container}>
@@ -436,25 +460,54 @@ export default function AdminDashboard() {
               const barWidth = Math.max((g.users / topOriginUsers) * 100, 6);
               const isTop = i === 0;
               return (
-                <div key={i} className={styles.rankRow}>
-                  <div className={`${styles.rankPos} ${isTop ? styles.rankPosTop : ''}`}>
-                    {isTop ? <Trophy size={16} /> : `#${i + 1}`}
-                  </div>
-                  <div className={styles.rankMain}>
-                    <div className={styles.rankHead}>
+                <div key={i} className={styles.rankCard}>
+                  <div className={styles.rankCardHead}>
+                    <div className={`${styles.rankPos} ${isTop ? styles.rankPosTop : ''}`}>
+                      {isTop ? <Trophy size={16} /> : `#${i + 1}`}
+                    </div>
+                    <div className={styles.rankIdentity}>
                       <span className={styles.rankName}>{g.influencer}</span>
-                      {g.social && <span className={styles.socialTag}>{g.social}</span>}
-                      <span className={styles.rankSpacer} />
-                      <span className={styles.rankUsers}>{g.users.toLocaleString('pt-BR')} usuários</span>
+                      <div className={styles.rankMeta}>
+                        <span><PlayCircle size={13} /> {g.plays} plays</span>
+                        <span><MousePointerClick size={13} /> {g.links} no link</span>
+                      </div>
                     </div>
-                    <div className={styles.rankBarTrack}>
-                      <div className={styles.rankBar} style={{ width: `${barWidth}%` }} />
+                    <div className={styles.rankKpi}>
+                      <div className={styles.rankKpiVal}>{g.users.toLocaleString('pt-BR')}</div>
+                      <div className={styles.rankKpiLabel}>usuários</div>
                     </div>
-                    <div className={styles.rankMeta}>
-                      <span>▶ {g.plays} plays</span>
-                      <span>🔗 {g.links} foram pro link</span>
-                      <span className={styles.rankConv}>{conv}% conversão</span>
+                    <div className={styles.rankKpiDivider} />
+                    <div className={styles.rankKpi}>
+                      <div className={styles.rankKpiVal} style={{ color: '#22c55e' }}>{conv}%</div>
+                      <div className={styles.rankKpiLabel}>conversão</div>
                     </div>
+                  </div>
+
+                  <div className={styles.rankBarTrack}>
+                    <div className={styles.rankBar} style={{ width: `${barWidth}%` }} />
+                  </div>
+
+                  {/* Quebra por rede social: uma linha pra cada rede */}
+                  <div className={styles.socialBlock}>
+                    <div className={styles.socialBlockTitle}>POR REDE SOCIAL</div>
+                    {g.socialList.map((s: any, si: number) => {
+                      const sConv = s.users > 0 ? Math.round((s.links / s.users) * 100) : 0;
+                      const sWidth = Math.max((s.users / g.users) * 100, 4);
+                      const sColor = SOCIAL_COLOR[s.name] || '#a855f7';
+                      return (
+                        <div key={si} className={styles.socialRow}>
+                          <span className={styles.socialRowName}>
+                            <span className={styles.socialDot} style={{ backgroundColor: sColor }} />
+                            {socialLabel(s.name)}
+                          </span>
+                          <div className={styles.socialRowBarTrack}>
+                            <div className={styles.socialRowBar} style={{ width: `${sWidth}%`, background: `linear-gradient(90deg, ${sColor}99, ${sColor})` }} />
+                          </div>
+                          <span className={styles.socialRowUsers}>{s.users} usuários</span>
+                          <span className={styles.socialRowExtra}>{s.plays} plays · {s.links} link · {sConv}%</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );

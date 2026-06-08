@@ -1,6 +1,6 @@
 import { useEffect, useRef, RefObject } from 'react';
 import { supabase } from '../lib/supabase';
-import { slugify } from '../lib/influencers';
+import { slugify, getInfluencerBySlug } from '../lib/influencers';
 
 // Declarar as variáveis globais do Meta e GTM pro TypeScript não reclamar
 declare global {
@@ -50,9 +50,9 @@ export function useRobloxAnalytics(
   };
 
   // Slug do influenciador padronizado (igual ao cadastro): "Nathan" -> "nathan"
-  const influencer = origin?.influencer ? (slugify(origin.influencer) || null) : null;
+  const rawInfluencerSlug = origin?.influencer ? (slugify(origin.influencer) || null) : null;
   // Rede social padronizada em minúsculo (instagram, tiktok, youtube...)
-  const social = cleanSlug(origin?.social)?.toLowerCase() ?? null;
+  const rawSocial = cleanSlug(origin?.social)?.toLowerCase() ?? null;
 
   const updateSession = async (dataToUpdate: any) => {
     if (!visitorId.current) return;
@@ -87,15 +87,30 @@ export function useRobloxAnalytics(
       }
 
       const deviceType = getDeviceType();
+
+      // VALIDAÇÃO: só conta como origem de influenciador se ele EXISTIR cadastrado.
+      // /satorogojo (não cadastrado) -> acesso normal, sem criar nada.
+      let influencer: string | null = null;
+      let social: string | null = null;
+      if (rawInfluencerSlug) {
+        const inf = await getInfluencerBySlug(rawInfluencerSlug);
+        if (inf) {
+          influencer = rawInfluencerSlug;
+          social = rawSocial;
+        } else {
+          console.log(`%c[TRACKING] /${rawInfluencerSlug} não é influenciador cadastrado — tratando como acesso normal.`, "color: #8b8b93;");
+        }
+      }
+
       const { data } = await supabase.from('lp_roblox').select('*').eq('visitor_id', currentVisitorId).maybeSingle();
-      
+
       if (!data) {
         await supabase.from('lp_roblox').insert([{
           visitor_id: currentVisitorId,
           page_views: 1,
           ip_address: userIp,
           device_type: deviceType,
-          // Origem do tráfego capturada da URL (/influenciador/rede-social)
+          // Origem do tráfego (só preenchida se o influenciador existir)
           influencer: influencer,
           social_network: social
         }]);

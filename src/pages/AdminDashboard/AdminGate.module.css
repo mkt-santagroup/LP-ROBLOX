@@ -1,0 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
+
+.wrap {
+  min-height: 100vh;
+  background-color: #0d0d12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Montserrat', sans-serif;
+  padding: 24px;
+}
+
+.card {
+  width: 100%;
+  max-width: 380px;
+  background-color: #16161b;
+  border: 1px solid #1f1f27;
+  border-radius: 16px;
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.iconCircle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #a855f714;
+  border: 1px solid #a855f733;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.card h1 {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 8px 0;
+}
+.card p {
+  font-size: 13.5px;
+  color: #8b8b93;
+  margin: 0 0 24px 0;
+  font-weight: 500;
+}
+
+.card input {
+  width: 100%;
+  background: #0f0f14;
+  border: 1px solid #2a2a35;
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: #fff;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  text-align: center;
+  letter-spacing: 1px;
+  transition: border-color 0.2s;
+}
+.card input:focus { border-color: #a855f7; }
+.card input::placeholder { color: #5a5a63; letter-spacing: normal; }
+.inputError { border-color: #ef4444 !important; }
+
+.errorMsg {
+  color: #fca5a5;
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-top: 10px;
+}
+
+.card button {
+  width: 100%;
+  margin-top: 20px;
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: #fff;
+  border: none;
+  padding: 14px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.card button:hover { opacity: 0.92; }
+.card button:active { transform: scale(0.98); }
