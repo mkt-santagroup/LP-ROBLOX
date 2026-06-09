@@ -8,7 +8,7 @@ import InfluencerPicker from './InfluencerPicker';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import {
   Users, Eye, Clock, PlayCircle, AlertTriangle, MousePointerClick, BarChart2,
-  Target, Smartphone, Monitor, Tablet, Trophy, Filter, Users2
+  Target, Smartphone, Monitor, Tablet, Trophy, Filter, Users2, Link2
 } from 'lucide-react';
 
 const KpiCard = ({ title, value, subtitle, icon: Icon, color = "#a855f7", highlight = false }: any) => (
@@ -201,8 +201,24 @@ export default function AdminDashboard() {
     }))
     .sort((a: any, b: any) => b.users - a.users);
 
-  const acessosDiretos = data.filter(d => !(d.influencer || '').trim()).length;
-  const topOriginUsers = originGroups.length > 0 ? originGroups[0].users : 1;
+  // Acessos diretos (sem influenciador na URL) viram uma entrada "Link direto"
+  const directRows = data.filter(d => !(d.influencer || '').trim());
+  const acessosDiretos = directRows.length;
+  const directGroup = directRows.length > 0 ? {
+    influencer: 'Link direto',
+    isDirect: true,
+    users: directRows.length,
+    plays: directRows.filter(d => d.click_start).length,
+    links: directRows.filter(d => d.click_link).length,
+    socialList: [] as any[],
+  } : null;
+
+  // Escala das barras considera também o tráfego direto
+  const topOriginUsers = Math.max(
+    originGroups.length > 0 ? originGroups[0].users : 0,
+    directGroup ? directGroup.users : 0,
+    1
+  );
 
   return (
     <div className={styles.container}>
@@ -448,7 +464,7 @@ export default function AdminDashboard() {
           <span><strong>{originGroups.length}</strong> origem(ns) rastreada(s)</span>
           <span><strong>{acessosDiretos}</strong> acesso(s) direto(s) (sem link)</span>
         </div>
-        {originGroups.length === 0 ? (
+        {originGroups.length === 0 && !directGroup ? (
           <div className={styles.originEmpty}>
             Nenhuma origem rastreada ainda. Use links no formato
             <code> /nome-do-influenciador/rede-social</code> para começar a rastrear.
@@ -512,6 +528,42 @@ export default function AdminDashboard() {
                 </div>
               );
             })}
+
+            {/* Tráfego direto: quem entrou sem link de influenciador */}
+            {directGroup && (
+              <div className={`${styles.rankCard} ${styles.rankCardDirect}`}>
+                <div className={styles.rankCardHead}>
+                  <div className={styles.rankPos}>
+                    <Link2 size={16} />
+                  </div>
+                  <div className={styles.rankIdentity}>
+                    <span className={styles.rankName}>Link direto</span>
+                    <div className={styles.rankMeta}>
+                      <span>Entraram direto, sem influenciador</span>
+                      <span><PlayCircle size={13} /> {directGroup.plays} plays</span>
+                      <span><MousePointerClick size={13} /> {directGroup.links} no link</span>
+                    </div>
+                  </div>
+                  <div className={styles.rankKpi}>
+                    <div className={styles.rankKpiVal}>{directGroup.users.toLocaleString('pt-BR')}</div>
+                    <div className={styles.rankKpiLabel}>usuários</div>
+                  </div>
+                  <div className={styles.rankKpiDivider} />
+                  <div className={styles.rankKpi}>
+                    <div className={styles.rankKpiVal} style={{ color: '#22c55e' }}>
+                      {directGroup.users > 0 ? ((directGroup.links / directGroup.users) * 100).toFixed(1) : "0.0"}%
+                    </div>
+                    <div className={styles.rankKpiLabel}>conversão</div>
+                  </div>
+                </div>
+                <div className={styles.rankBarTrack}>
+                  <div
+                    className={styles.rankBar}
+                    style={{ width: `${Math.max((directGroup.users / topOriginUsers) * 100, 6)}%`, background: 'linear-gradient(90deg, #4b5563, #6b7280)' }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

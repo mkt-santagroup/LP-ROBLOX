@@ -583,6 +583,12 @@
   border-radius: 14px;
   padding: 20px 22px;
 }
+/* Card do tráfego direto (sem influenciador) — visual neutro */
+.rankCardDirect {
+  border-style: dashed;
+  border-color: #33333d;
+  background: #121217;
+}
 .rankCardHead {
   display: flex;
   align-items: center;

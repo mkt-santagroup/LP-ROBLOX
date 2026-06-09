@@ -23,6 +23,8 @@ export function useRobloxAnalytics(
   const clickCalmaCount = useRef<number>(0);
   const highestExactProgress = useRef<number>(0);
   const highestMaxProgress = useRef<number>(0);
+  // Garante que o "Play" (click_start + pixel) seja contado UMA vez, no play real
+  const playStartedRef = useRef<boolean>(false);
   
   // Controle para disparar o PageView apenas uma vez por carregamento
   const pageViewFired = useRef<boolean>(false);
@@ -61,6 +63,17 @@ export function useRobloxAnalytics(
     } catch (error) {
       console.error('[Analytics] Erro ao atualizar sessão:', error);
     }
+  };
+
+  // Marca o início do vídeo (Play) só uma vez — disparado no play real do vídeo,
+  // independente de ter sido pelo CTA ou pelo botão do player.
+  const markPlayStarted = () => {
+    if (playStartedRef.current) return;
+    playStartedRef.current = true;
+    console.log(`%c[TRACKING] Disparando evento: Play`, "color: #f59e0b; font-weight: bold;");
+    if (window.fbq) window.fbq('trackCustom', 'Play');
+    if (window.dataLayer) window.dataLayer.push({ event: 'video_play' });
+    updateSession({ click_start: true });
   };
 
   useEffect(() => {
@@ -177,17 +190,17 @@ export function useRobloxAnalytics(
     };
 
     video.addEventListener('timeupdate', handleTimeUpdate);
-    return () => video.removeEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('play', markPlayStarted); // <-- Play real do vídeo marca o "Deram Play"
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('play', markPlayStarted);
+    };
   }, [videoRef, videoRef.current]); // <-- AQUI ESTÁ A MÁGICA: Adicionado videoRef.current de volta!
 
   return {
-    trackStartClick: () => {
-      console.log(`%c[TRACKING] Disparando evento: Play`, "color: #f59e0b; font-weight: bold;");
-      if (window.fbq) window.fbq('trackCustom', 'Play');
-      if (window.dataLayer) window.dataLayer.push({ event: 'video_play' });
-      
-      updateSession({ click_start: true });
-    },
+    // Mantido por compatibilidade — o Play real é marcado pelo evento 'play' do vídeo.
+    // Chamar aqui é idempotente (só conta uma vez).
+    trackStartClick: () => markPlayStarted(),
     trackBlockedClick: () => {
       clickCalmaCount.current += 1;
       updateSession({ click_calma: clickCalmaCount.current });
