@@ -5,10 +5,10 @@ import { listInfluencers, Influencer } from '../../lib/influencers';
 import styles from './AdminDashboard.module.css';
 import CustomDatePicker from './CustomDatePicker';
 import InfluencerPicker from './InfluencerPicker';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Bar, Legend } from 'recharts';
 import {
   Users, Eye, Clock, PlayCircle, AlertTriangle, MousePointerClick, BarChart2,
-  Target, Smartphone, Monitor, Tablet, Trophy, Filter, Users2, Link2
+  Target, Smartphone, Monitor, Tablet, Trophy, Filter, Users2, Link2, TrendingUp
 } from 'lucide-react';
 
 const KpiCard = ({ title, value, subtitle, icon: Icon, color = "#a855f7", highlight = false }: any) => (
@@ -72,6 +72,22 @@ export default function AdminDashboard() {
     };
   });
 
+  // Filtro rápido ativo (pills) — 'custom' quando usa o calendário
+  const [activeRange, setActiveRange] = useState<string>('tudo');
+
+  const applyPreset = (key: string) => {
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    let start: Date;
+    if (key === 'hoje') start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    else if (key === '7d') start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+    else if (key === '30d') start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+    else if (key === 'mes') start = new Date(now.getFullYear(), now.getMonth(), 1);
+    else start = new Date(2020, 0, 1); // tudo
+    setActiveRange(key);
+    setDateRange({ start, end });
+  };
+
   const fetchData = useCallback(async (start: Date, end: Date) => {
     setLoading(true);
     try {
@@ -111,6 +127,7 @@ export default function AdminDashboard() {
   })();
 
   const handleRangeChange = (start: Date, end: Date) => {
+    setActiveRange('custom');
     setDateRange({ start, end });
   };
 
@@ -168,6 +185,24 @@ export default function AdminDashboard() {
   const deviceData = Object.entries(deviceCounts)
     .map(([key, value]) => ({ key, value: value as number, ...DEVICE_META[key] }))
     .sort((a, b) => b.value - a.value);
+
+  // --- TIMELINE DE CONVERSÃO (por dia do período selecionado) ---
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const dayBuckets: Record<string, { acessos: number; conversoes: number }> = {};
+  data.forEach(row => {
+    if (!row.created_at) return;
+    const dt = new Date(row.created_at);
+    const key = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+    if (!dayBuckets[key]) dayBuckets[key] = { acessos: 0, conversoes: 0 };
+    dayBuckets[key].acessos += 1;
+    if (row.click_link) dayBuckets[key].conversoes += 1;
+  });
+  const conversionTimeline = Object.keys(dayBuckets).sort().map(key => {
+    const [, m, d] = key.split('-');
+    const b = dayBuckets[key];
+    const taxa = b.acessos > 0 ? Math.round((b.conversoes / b.acessos) * 100) : 0;
+    return { label: `${d}/${m}`, acessos: b.acessos, conversoes: b.conversoes, taxa };
+  });
 
   // --- ORIGEM / INFLUENCIADORES ---
   // Agrupa por influenciador e, dentro dele, quebra por rede social (uma linha por rede)
@@ -227,24 +262,48 @@ export default function AdminDashboard() {
           <h1>Roblox Analytics</h1>
           <p>Métricas reais de engajamento e conversão da Landing Page.</p>
         </div>
-        <div className={styles.controlsArea}>
-          <div className={styles.inputGroup}>
-            <label>Influenciador</label>
-            <InfluencerPicker
-              value={selectedInfluencer}
-              onChange={setSelectedInfluencer}
-              options={influencerOptions.map(([slug, name]) => ({ value: slug, label: name, slug }))}
-            />
+        <div className={styles.controlsCol}>
+          <div className={styles.controlsArea}>
+            <div className={styles.inputGroup}>
+              <label>Influenciador</label>
+              <InfluencerPicker
+                value={selectedInfluencer}
+                onChange={setSelectedInfluencer}
+                options={influencerOptions.map(([slug, name]) => ({ value: slug, label: name, slug }))}
+              />
+            </div>
+            <div className={styles.inputGroup}>
+              <label>Período personalizado</label>
+              <CustomDatePicker onRangeChange={handleRangeChange} value={dateRange} />
+            </div>
+            <div className={styles.inputGroup}>
+              <label>&nbsp;</label>
+              <Link to="/admin/influenciadores" className={styles.manageBtn}>
+                <Users2 size={16} /> Gerenciar
+              </Link>
+            </div>
           </div>
-          <div className={styles.inputGroup}>
-            <label>Período de Análise</label>
-            <CustomDatePicker onRangeChange={handleRangeChange} />
-          </div>
-          <div className={styles.inputGroup}>
-            <label>&nbsp;</label>
-            <Link to="/admin/influenciadores" className={styles.manageBtn}>
-              <Users2 size={16} /> Gerenciar
-            </Link>
+
+          {/* Filtros rápidos de período — logo abaixo da data */}
+          <div className={styles.quickBar}>
+            {[
+              { key: 'tudo', label: 'Tudo' },
+              { key: 'hoje', label: 'Hoje' },
+              { key: '7d', label: '7 dias' },
+              { key: '30d', label: '30 dias' },
+              { key: 'mes', label: 'Este mês' },
+            ].map(p => (
+              <button
+                key={p.key}
+                className={`${styles.quickPill} ${activeRange === p.key ? styles.quickPillActive : ''}`}
+                onClick={() => applyPreset(p.key)}
+              >
+                {p.label}
+              </button>
+            ))}
+            {activeRange === 'custom' && (
+              <span className={`${styles.quickPill} ${styles.quickPillActive}`}>Personalizado</span>
+            )}
           </div>
         </div>
       </header>
@@ -394,6 +453,47 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* FILEIRA 2.5: Desempenho de conversão ao longo do tempo */}
+      <h2 className={styles.sectionHeader}>DESEMPENHO DE CONVERSÃO</h2>
+      <div className={styles.panel}>
+        <div className={styles.cardTitle}>
+          <TrendingUp size={20} color="#22c55e" />
+          Conversões ao longo do tempo
+        </div>
+        <p className={styles.panelSub}>Quantas pessoas foram pro jogo a cada dia (vs. quantas acessaram)</p>
+        {conversionTimeline.length === 0 ? (
+          <div className={styles.emptyMini}>Sem dados no período.</div>
+        ) : (
+          <div style={{ width: '100%', height: 320, marginTop: 12 }}>
+            <ResponsiveContainer>
+              <ComposedChart data={conversionTimeline} margin={{ top: 10, right: 16, left: -16, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gradAcessos" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#a855f7" stopOpacity={0.95} />
+                    <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.35} />
+                  </linearGradient>
+                  <linearGradient id="gradConv" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#22c55e" stopOpacity={0.45} />
+                    <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#23232c" />
+                <XAxis dataKey="label" stroke="#8b8b93" fontSize={12} tickLine={false} axisLine={false} minTickGap={24} />
+                <YAxis stroke="#8b8b93" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                <Tooltip
+                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  contentStyle={{ backgroundColor: '#16161b', borderColor: '#2a2a35', color: '#fff', borderRadius: '8px' }}
+                  labelStyle={{ color: '#8b8b93', marginBottom: 4 }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                <Bar dataKey="acessos" name="Acessos" fill="url(#gradAcessos)" radius={[6, 6, 0, 0]} maxBarSize={46} />
+                <Area type="monotone" dataKey="conversoes" name="Conversões" stroke="#22c55e" strokeWidth={3} fill="url(#gradConv)" dot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }} activeDot={{ r: 6, fill: '#fff', stroke: '#22c55e', strokeWidth: 2 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
 
       {/* FILEIRA 3: Dispositivos (roxo) full-width */}

@@ -103,6 +103,45 @@
 }
 .manageBtn:hover { opacity: 0.92; }
 
+/* Coluna de controles (filtros em cima, pills embaixo) */
+.controlsCol {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-end;
+}
+
+/* Barra de filtros rápidos de período — embaixo da data */
+.quickBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-bottom: 0;
+}
+.quickPill {
+  background: #16161b;
+  border: 1px solid #26262f;
+  color: #b4b4bd;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.quickPill:hover {
+  border-color: #a855f7;
+  color: #fff;
+}
+.quickPillActive {
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  border-color: transparent;
+  color: #fff;
+}
+
 /* Títulos de cada fileira */
 .sectionHeader {
   display: flex;
