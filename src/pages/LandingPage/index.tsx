@@ -10,13 +10,15 @@ import { getInfluencerBySlug, slugify } from '../../lib/influencers';
 import styles from '../../App.module.css';
 import { useRobloxAnalytics } from '../../hooks/useRobloxAnalytics';
 
-const TOTAL_TIME = 20;
-const UNLOCK_TIME = TOTAL_TIME * 0.90; // 80% do vídeo
+// Libera o botão quando a pessoa assistiu acima de 75% do VÍDEO REAL
+// (detecta a duração automaticamente, sem timer fixo).
+const UNLOCK_PERCENT = 75;
 
 export const LandingPage = () => {
   const [data, setData] = useState<any>(null);
   const [state, setState] = useState<'initial' | 'watching' | 'blocked' | 'unlocked'>('initial');
-  const [elapsed, setElapsed] = useState(0);
+  const [videoProgress, setVideoProgress] = useState(0); // % real do vídeo assistido (0-100)
+  const videoProgressRef = useRef(0);                    // maior % atingido (pra ler nos handlers)
   const [isPlaying, setIsPlaying] = useState(false);
   const [label, setLabel] = useState('QUERO JOGAR!');
 
@@ -40,22 +42,27 @@ export const LandingPage = () => {
     return () => { active = false; };
   }, [influencer]);
 
+  // Acompanha o progresso REAL do vídeo (currentTime / duração) e libera o botão
+  // assim que a pessoa passa de 75% assistido — funciona pra vídeo de qualquer duração.
   useEffect(() => {
-    let interval: any;
-    if (isPlaying && elapsed < TOTAL_TIME) {
-      interval = setInterval(() => {
-        setElapsed(prev => {
-          const next = Math.min(prev + 0.25, TOTAL_TIME);
-          if (next >= UNLOCK_TIME && state !== 'unlocked' && state !== 'blocked') {
-            setState('unlocked');
-            setLabel('JOGAR AGORA');
-          }
-          return next;
-        });
-      }, 250);
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying, elapsed, state]);
+    const video = videoRef.current;
+    if (!video) return;
+
+    const onTime = () => {
+      if (!video.duration || isNaN(video.duration)) return;
+      const pct = Math.min((video.currentTime / video.duration) * 100, 100);
+      videoProgressRef.current = Math.max(videoProgressRef.current, pct);
+      setVideoProgress(prev => Math.max(prev, pct));
+
+      if (videoProgressRef.current >= UNLOCK_PERCENT && state !== 'unlocked' && state !== 'blocked') {
+        setState('unlocked');
+        setLabel('JOGAR AGORA');
+      }
+    };
+
+    video.addEventListener('timeupdate', onTime);
+    return () => video.removeEventListener('timeupdate', onTime);
+  }, [videoRef.current, state, data]);
 
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
@@ -79,7 +86,7 @@ export const LandingPage = () => {
       setLabel('CALMAAA...');
       
       setTimeout(() => {
-        if (elapsed >= UNLOCK_TIME) {
+        if (videoProgressRef.current >= UNLOCK_PERCENT) {
           setState('unlocked');
           setLabel('JOGAR AGORA');
         } else {
@@ -99,7 +106,7 @@ export const LandingPage = () => {
         <div className={styles.page}>
           <Header logoUrl={data.logoUrl} />
           <CTAButton state={state} onClick={handleCTA} label={label} />
-          <ProgressBar progress={(elapsed / TOTAL_TIME) * 100} isUnlocked={state === 'unlocked'} />
+          <ProgressBar progress={videoProgress} isUnlocked={state === 'unlocked'} />
           <VideoPlayer 
             videoUrl={data.videoUrl} 
             isPlaying={isPlaying} 
