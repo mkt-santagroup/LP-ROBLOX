@@ -79,7 +79,9 @@ export const LandingPage = () => {
       window.scrollTo({ top: 200, behavior: 'smooth' });
     } else if (state === 'unlocked') {
       trackLinkClick();
-      window.location.href = data?.gameUrl;
+      // Pequeno delay pro GTM/pixel disparar a conversão (entrou_no_jogo) ANTES
+      // do redirect pro Roblox — senão a navegação pode cancelar o envio do evento.
+      setTimeout(() => { window.location.href = data?.gameUrl; }, 350);
     } else if (state === 'watching') {
       trackBlockedClick();
       setState('blocked');

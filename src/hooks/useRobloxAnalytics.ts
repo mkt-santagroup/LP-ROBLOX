@@ -70,8 +70,7 @@ export function useRobloxAnalytics(
   const markPlayStarted = () => {
     if (playStartedRef.current) return;
     playStartedRef.current = true;
-    console.log(`%c[TRACKING] Disparando evento: Play`, "color: #f59e0b; font-weight: bold;");
-    if (window.fbq) window.fbq('trackCustom', 'Play');
+    console.log(`%c[TRACKING] dataLayer -> video_play`, "color: #f59e0b; font-weight: bold;");
     if (window.dataLayer) window.dataLayer.push({ event: 'video_play' });
     updateSession({ click_start: true });
   };
@@ -176,9 +175,8 @@ export function useRobloxAnalytics(
           sessionMilestones.current.add(point);
           
           // --- LOG DE TRACKING (PORCENTAGEM) ---
-          console.log(`%c[TRACKING] Disparando evento: Porcentagem_${point}%`, "color: #f59e0b; font-weight: bold;");
-          
-          if (window.fbq) window.fbq('trackCustom', `Porcentagem_${point}`);
+          console.log(`%c[TRACKING] dataLayer -> video_progress ${point}%`, "color: #f59e0b; font-weight: bold;");
+
           if (window.dataLayer) window.dataLayer.push({ event: 'video_progress', percent: point });
 
           if (point > highestMaxProgress.current) {
@@ -203,11 +201,14 @@ export function useRobloxAnalytics(
     trackStartClick: () => markPlayStarted(),
     trackBlockedClick: () => {
       clickCalmaCount.current += 1;
+      // Clique enquanto BLOQUEADO (calma) — evento separado, NÃO é conversão.
+      console.log(`%c[TRACKING] dataLayer -> clique_bloqueado (NÃO é conversão)`, "color: #ef4444; font-weight: bold;");
+      if (window.dataLayer) window.dataLayer.push({ event: 'clique_bloqueado' });
       updateSession({ click_calma: clickCalmaCount.current });
     },
     trackLinkClick: () => {
-      console.log(`%c[TRACKING] Disparando evento: Entrou no jogo`, "color: #22c55e; font-weight: bold;");
-      if (window.fbq) window.fbq('trackCustom', 'Entrou no jogo');
+      // Conversão REAL — só dispara aqui (botão liberado, indo pro jogo). Nunca no "calma".
+      console.log(`%c[TRACKING] dataLayer -> entrou_no_jogo (CONVERSÃO)`, "color: #22c55e; font-weight: bold;");
       if (window.dataLayer) window.dataLayer.push({ event: 'entrou_no_jogo' });
 
       updateSession({ click_link: true });
