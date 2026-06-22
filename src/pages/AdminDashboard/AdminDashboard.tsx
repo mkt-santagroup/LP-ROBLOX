@@ -8,7 +8,7 @@ import InfluencerPicker from './InfluencerPicker';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Bar, Line, Legend } from 'recharts';
 import {
   Users, Eye, Clock, PlayCircle, AlertTriangle, MousePointerClick, BarChart2,
-  Target, Smartphone, Monitor, Tablet, Trophy, Filter, Users2, Link2, TrendingUp
+  Target, Smartphone, Monitor, Tablet, Trophy, Filter, Users2, Link2, TrendingUp, Ticket
 } from 'lucide-react';
 
 const KpiCard = ({ title, value, subtitle, icon: Icon, color = "#a855f7", highlight = false }: any) => (
@@ -246,6 +246,7 @@ export default function AdminDashboard() {
     { label: 'Viram 95%', value: countAtLeast(95), color: '#84cc16', icon: Eye },
     { label: 'Assistiram 100%', value: countAtLeast(100), color: '#f59e0b', icon: Trophy },
     { label: 'Clicaram no Link', value: foramProLink, color: '#ec4899', icon: MousePointerClick },
+    { label: 'Resgataram Codiguin', value: usagesView.length, color: '#a855f7', icon: Ticket },
   ];
   const funnelTop = funnelStages[0].value || 1;
 
