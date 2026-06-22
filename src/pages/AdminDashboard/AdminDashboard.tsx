@@ -5,7 +5,7 @@ import { listInfluencers, Influencer } from '../../lib/influencers';
 import styles from './AdminDashboard.module.css';
 import CustomDatePicker from './CustomDatePicker';
 import InfluencerPicker from './InfluencerPicker';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Bar, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Bar, Line, Legend } from 'recharts';
 import {
   Users, Eye, Clock, PlayCircle, AlertTriangle, MousePointerClick, BarChart2,
   Target, Smartphone, Monitor, Tablet, Trophy, Filter, Users2, Link2, TrendingUp
@@ -50,9 +50,33 @@ const SOCIAL_COLOR: Record<string, string> = {
 const socialLabel = (name: string) =>
   name === 'direto' ? 'Direto (sem rede)' : name.charAt(0).toUpperCase() + name.slice(1);
 
+// Tooltip custom do gráfico de conversão: acessos + conversões (LP) + codiguins (Roblox) do dia
+function ConversionTooltip({ active, payload, label }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const row = payload[0].payload || {};
+  const codes = Object.entries(row.codes || {}).sort((a: any, b: any) => b[1] - a[1]);
+  return (
+    <div className={styles.convTooltip}>
+      <div className={styles.convTooltipDay}>{label}</div>
+      <div className={styles.convTooltipRow}><span>Acessos</span><b>{row.acessos ?? 0}</b></div>
+      <div className={styles.convTooltipRow} style={{ color: '#22c55e' }}><span>Conversões (LP)</span><b>{row.conversoes ?? 0}</b></div>
+      <div className={styles.convTooltipRow} style={{ color: '#f59e0b' }}><span>Resgates (Roblox)</span><b>{row.resgates ?? 0}</b></div>
+      {codes.length > 0 && (
+        <div className={styles.convTooltipCodes}>
+          {codes.map(([c, n]: any) => (
+            <div key={c} className={styles.convTooltipCodeRow}><span>🎟️ {c}</span><b>{n}</b></div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [allData, setAllData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // Resgates de cupom no Roblox (espelhados da API via Edge Function), filtrados pelo período
+  const [couponUsages, setCouponUsages] = useState<any[]>([]);
 
   // Filtro por influenciador ('all' = todos)
   const [influencers, setInfluencers] = useState<Influencer[]>([]);
@@ -91,15 +115,26 @@ export default function AdminDashboard() {
   const fetchData = useCallback(async (start: Date, end: Date) => {
     setLoading(true);
     try {
-      const { data: result, error } = await supabase
-        .from('lp_roblox')
-        .select('*')
-        .gte('created_at', start.toISOString())
-        .lte('created_at', end.toISOString())
-        .order('created_at', { ascending: false });
+      // O Supabase/PostgREST devolve no máx 1000 linhas por request.
+      // Pagina com .range() até trazer TODOS os registros do período.
+      const PAGE = 1000;
+      let from = 0;
+      let all: any[] = [];
+      while (true) {
+        const { data: page, error } = await supabase
+          .from('lp_roblox')
+          .select('*')
+          .gte('created_at', start.toISOString())
+          .lte('created_at', end.toISOString())
+          .order('created_at', { ascending: false })
+          .range(from, from + PAGE - 1);
 
-      if (error) throw error;
-      setAllData(result || []);
+        if (error) throw error;
+        all = all.concat(page || []);
+        if (!page || page.length < PAGE) break; // última página
+        from += PAGE;
+      }
+      setAllData(all);
     } catch (err) {
       console.error("Erro ao buscar dados:", err);
     } finally {
@@ -114,6 +149,33 @@ export default function AdminDashboard() {
   useEffect(() => {
     listInfluencers().then(setInfluencers);
   }, []);
+
+  // Busca os resgates de cupom (Roblox) do período selecionado
+  useEffect(() => {
+    (async () => {
+      const PAGE = 1000;
+      let from = 0;
+      let all: any[] = [];
+      try {
+        while (true) {
+          const { data: page, error } = await supabase
+            .from('coupon_usages')
+            .select('coupon_code, used_at')
+            .gte('used_at', dateRange.start.toISOString())
+            .lte('used_at', dateRange.end.toISOString())
+            .range(from, from + PAGE - 1);
+          if (error) throw error;
+          all = all.concat(page || []);
+          if (!page || page.length < PAGE) break;
+          from += PAGE;
+        }
+        setCouponUsages(all);
+      } catch (e) {
+        // Tabela ainda não existe / sync não rodou — segue vazio (sem quebrar)
+        setCouponUsages([]);
+      }
+    })();
+  }, [dateRange]);
 
   // Opções do filtro: cadastrados + quaisquer slugs que apareçam nos dados
   const influencerOptions = (() => {
@@ -186,22 +248,33 @@ export default function AdminDashboard() {
     .map(([key, value]) => ({ key, value: value as number, ...DEVICE_META[key] }))
     .sort((a, b) => b.value - a.value);
 
-  // --- TIMELINE DE CONVERSÃO (por dia do período selecionado) ---
+  // --- TIMELINE DIÁRIA: acessos + conversões (LP) + resgates de codiguin (Roblox) ---
   const pad2 = (n: number) => String(n).padStart(2, '0');
-  const dayBuckets: Record<string, { acessos: number; conversoes: number }> = {};
+  const dayMap: Record<string, { acessos: number; conversoes: number; codes: Record<string, number> }> = {};
+  const ensureDay = (k: string) => (dayMap[k] = dayMap[k] || { acessos: 0, conversoes: 0, codes: {} });
+
   data.forEach(row => {
     if (!row.created_at) return;
     const dt = new Date(row.created_at);
-    const key = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
-    if (!dayBuckets[key]) dayBuckets[key] = { acessos: 0, conversoes: 0 };
-    dayBuckets[key].acessos += 1;
-    if (row.click_link) dayBuckets[key].conversoes += 1;
+    const k = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+    const b = ensureDay(k);
+    b.acessos += 1;
+    if (row.click_link) b.conversoes += 1;
   });
-  const conversionTimeline = Object.keys(dayBuckets).sort().map(key => {
-    const [, m, d] = key.split('-');
-    const b = dayBuckets[key];
-    const taxa = b.acessos > 0 ? Math.round((b.conversoes / b.acessos) * 100) : 0;
-    return { label: `${d}/${m}`, acessos: b.acessos, conversoes: b.conversoes, taxa };
+  couponUsages.forEach(u => {
+    if (!u.used_at) return;
+    const dt = new Date(u.used_at);
+    const k = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+    const code = (u.coupon_code || '').toUpperCase();
+    if (!code) return;
+    const b = ensureDay(k);
+    b.codes[code] = (b.codes[code] || 0) + 1;
+  });
+  const conversionTimeline = Object.keys(dayMap).sort().map(k => {
+    const [, m, d] = k.split('-');
+    const b = dayMap[k];
+    const resgates = Object.values(b.codes).reduce((s, n) => s + n, 0);
+    return { label: `${d}/${m}`, acessos: b.acessos, conversoes: b.conversoes, resgates, codes: b.codes };
   });
 
   // --- ORIGEM / INFLUENCIADORES ---
@@ -254,6 +327,24 @@ export default function AdminDashboard() {
     directGroup ? directGroup.users : 0,
     1
   );
+
+  // --- CONVERSÃO FINAL NO ROBLOX (resgates de codiguin no período) ---
+  const robloxTotal = couponUsages.length;
+  const usageByCode: Record<string, number> = {};
+  couponUsages.forEach(u => {
+    const c = (u.coupon_code || '').toUpperCase();
+    if (c) usageByCode[c] = (usageByCode[c] || 0) + 1;
+  });
+  const codeToInfluencers: Record<string, string[]> = {};
+  influencers.forEach(inf => {
+    if (inf.roblox_code) {
+      const c = inf.roblox_code.toUpperCase();
+      (codeToInfluencers[c] = codeToInfluencers[c] || []).push(inf.name);
+    }
+  });
+  const robloxBreakdown = Array.from(new Set([...Object.keys(usageByCode), ...Object.keys(codeToInfluencers)]))
+    .map(code => ({ code, count: usageByCode[code] || 0, influencers: codeToInfluencers[code] || [] }))
+    .sort((a, b) => b.count - a.count);
 
   return (
     <div className={styles.container}>
@@ -482,14 +573,11 @@ export default function AdminDashboard() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#23232c" />
                 <XAxis dataKey="label" stroke="#8b8b93" fontSize={12} tickLine={false} axisLine={false} minTickGap={24} />
                 <YAxis stroke="#8b8b93" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-                <Tooltip
-                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                  contentStyle={{ backgroundColor: '#16161b', borderColor: '#2a2a35', color: '#fff', borderRadius: '8px' }}
-                  labelStyle={{ color: '#8b8b93', marginBottom: 4 }}
-                />
+                <Tooltip content={<ConversionTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                 <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
                 <Bar dataKey="acessos" name="Acessos" fill="url(#gradAcessos)" radius={[6, 6, 0, 0]} maxBarSize={46} />
                 <Area type="monotone" dataKey="conversoes" name="Conversões" stroke="#22c55e" strokeWidth={3} fill="url(#gradConv)" dot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }} activeDot={{ r: 6, fill: '#fff', stroke: '#22c55e', strokeWidth: 2 }} />
+                <Line type="monotone" dataKey="resgates" name="Resgates (Roblox)" stroke="#f59e0b" strokeWidth={3} dot={{ r: 3, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6, fill: '#fff', stroke: '#f59e0b', strokeWidth: 2 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -664,6 +752,34 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* CONVERSÃO FINAL NO ROBLOX (resgates de codiguin) */}
+      <h2 className={styles.sectionHeader}>CONVERSÃO FINAL NO ROBLOX — CODIGUINS</h2>
+      <div className={styles.panel}>
+        <div className={styles.originSummary}>
+          <span><strong>{robloxTotal.toLocaleString('pt-BR')}</strong> resgate(s) de cupom no Roblox no período</span>
+        </div>
+        {robloxBreakdown.length === 0 ? (
+          <div className={styles.originEmpty}>
+            Nenhum resgate ainda. Cadastre o <code>codiguin</code> dos influenciadores e ative o
+            sync com a API do Roblox pra ver a conversão final aqui.
+          </div>
+        ) : (
+          <div className={styles.codeList}>
+            {robloxBreakdown.map((r, i) => (
+              <div key={i} className={styles.codeRow}>
+                <span className={styles.codeTag}>🎟️ {r.code}</span>
+                <span className={styles.codeInf}>
+                  {r.influencers.length ? r.influencers.join(', ') : <em>sem influenciador vinculado</em>}
+                </span>
+                <span className={styles.rankSpacer} />
+                <span className={styles.codeCount}>{r.count.toLocaleString('pt-BR')}</span>
+                <span className={styles.codeCountLabel}>resgates</span>
+              </div>
+            ))}
           </div>
         )}
       </div>

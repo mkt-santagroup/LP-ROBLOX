@@ -628,6 +628,90 @@
   border-color: #33333d;
   background: #121217;
 }
+
+/* Lista de codiguins (conversão final Roblox) */
+.codeList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.codeRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #14141a;
+  border: 1px solid #26262f;
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+.codeTag {
+  font-size: 14px;
+  font-weight: 800;
+  color: #f59e0b;
+  background: #f59e0b14;
+  padding: 5px 12px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.codeInf {
+  font-size: 14px;
+  color: #d4d4d8;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.codeInf em { color: #6b6b73; font-style: normal; }
+.codeCount {
+  font-size: 24px;
+  font-weight: 800;
+  color: #22c55e;
+}
+.codeCountLabel {
+  font-size: 12px;
+  color: #8b8b93;
+  font-weight: 600;
+}
+/* Tooltip custom do gráfico de conversão (acessos + conversões + codiguins) */
+.convTooltip {
+  background: #16161b;
+  border: 1px solid #2a2a35;
+  border-radius: 10px;
+  padding: 12px 14px;
+  min-width: 180px;
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.6);
+}
+.convTooltipDay {
+  font-size: 12px;
+  color: #8b8b93;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.convTooltipRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e4e4e7;
+  padding: 2px 0;
+}
+.convTooltipRow b { font-weight: 800; }
+.convTooltipCodes {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #2a2a35;
+}
+.convTooltipCodeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #f59e0b;
+  padding: 2px 0;
+}
+.convTooltipCodeRow b { color: #fff; font-weight: 800; }
 .rankCardHead {
   display: flex;
   align-items: center;

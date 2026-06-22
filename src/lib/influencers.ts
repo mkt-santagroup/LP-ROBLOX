@@ -5,7 +5,14 @@ export interface Influencer {
   slug: string;
   name: string;
   video_url: string | null;
+  roblox_code: string | null; // codiguin do cupom no Roblox (ex: BRASIL, MILA)
   created_at?: string;
+}
+
+// Padroniza o codiguin (MAIÚSCULO, sem espaços) pra bater com a API do Roblox
+export function normalizeCode(code: string): string | null {
+  const c = (code || '').trim().toUpperCase().replace(/\s+/g, '');
+  return c.length > 0 ? c : null;
 }
 
 // Transforma "Nathan Silva" -> "nathan-silva" (sem acento, minúsculo, hífens)
@@ -47,14 +54,14 @@ export async function listInfluencers(): Promise<Influencer[]> {
   return data || [];
 }
 
-// Adiciona um influenciador (nome + vídeo). Retorna { error } se o slug já existir.
-export async function addInfluencer(name: string, videoUrl: string): Promise<{ data: Influencer | null; error: string | null }> {
+// Adiciona um influenciador (nome + vídeo + codiguin). Retorna { error } se o slug já existir.
+export async function addInfluencer(name: string, videoUrl: string, robloxCode: string = ''): Promise<{ data: Influencer | null; error: string | null }> {
   const slug = slugify(name);
   if (!slug) return { data: null, error: 'Nome inválido.' };
 
   const { data, error } = await supabase
     .from('lp_influencers')
-    .insert([{ slug, name: name.trim(), video_url: videoUrl.trim() || null }])
+    .insert([{ slug, name: name.trim(), video_url: videoUrl.trim() || null, roblox_code: normalizeCode(robloxCode) }])
     .select()
     .single();
 
@@ -65,13 +72,13 @@ export async function addInfluencer(name: string, videoUrl: string): Promise<{ d
   return { data, error: null };
 }
 
-// Atualiza nome/vídeo de um influenciador existente
-export async function updateInfluencer(id: string, name: string, videoUrl: string): Promise<{ error: string | null }> {
+// Atualiza nome/vídeo/codiguin de um influenciador existente
+export async function updateInfluencer(id: string, name: string, videoUrl: string, robloxCode: string = ''): Promise<{ error: string | null }> {
   const slug = slugify(name);
   if (!slug) return { error: 'Nome inválido.' };
   const { error } = await supabase
     .from('lp_influencers')
-    .update({ slug, name: name.trim(), video_url: videoUrl.trim() || null })
+    .update({ slug, name: name.trim(), video_url: videoUrl.trim() || null, roblox_code: normalizeCode(robloxCode) })
     .eq('id', id);
   if (error) {
     if (error.code === '23505') return { error: `Já existe um influenciador com o link /${slug}.` };

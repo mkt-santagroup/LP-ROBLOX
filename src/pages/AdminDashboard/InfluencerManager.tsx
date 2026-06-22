@@ -15,6 +15,7 @@ export default function InfluencerManager() {
   // Form de novo influenciador
   const [name, setName] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
+  const [robloxCode, setRobloxCode] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,6 +23,7 @@ export default function InfluencerManager() {
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editVideo, setEditVideo] = useState('');
+  const [editCode, setEditCode] = useState('');
 
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -40,10 +42,10 @@ export default function InfluencerManager() {
     setError(null);
     if (!name.trim()) { setError('Coloque o nome do influenciador.'); return; }
     setSaving(true);
-    const { error } = await addInfluencer(name, videoUrl);
+    const { error } = await addInfluencer(name, videoUrl, robloxCode);
     setSaving(false);
     if (error) { setError(error); return; }
-    setName(''); setVideoUrl('');
+    setName(''); setVideoUrl(''); setRobloxCode('');
     load();
   };
 
@@ -51,10 +53,11 @@ export default function InfluencerManager() {
     setEditId(inf.id);
     setEditName(inf.name);
     setEditVideo(inf.video_url || '');
+    setEditCode(inf.roblox_code || '');
   };
 
   const saveEdit = async (id: string) => {
-    const { error } = await updateInfluencer(id, editName, editVideo);
+    const { error } = await updateInfluencer(id, editName, editVideo, editCode);
     if (error) { setError(error); return; }
     setEditId(null);
     load();
@@ -113,6 +116,17 @@ export default function InfluencerManager() {
             />
             <span className={styles.hint}>Se vazio, usa o vídeo padrão da LP.</span>
           </div>
+          <div className={styles.field}>
+            <label>Codiguin do Roblox (opcional)</label>
+            <input
+              type="text"
+              placeholder="Ex: BRASIL"
+              value={robloxCode}
+              onChange={(e) => setRobloxCode(e.target.value)}
+              style={{ textTransform: 'uppercase' }}
+            />
+            <span className={styles.hint}>Código do cupom no jogo — mede a conversão final no Roblox.</span>
+          </div>
         </div>
 
         {error && <div className={styles.error}>{error}</div>}
@@ -141,6 +155,7 @@ export default function InfluencerManager() {
                 <div className={styles.editArea}>
                   <input className={styles.editInput} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Nome" />
                   <input className={styles.editInput} value={editVideo} onChange={(e) => setEditVideo(e.target.value)} placeholder="URL do vídeo" />
+                  <input className={styles.editInput} value={editCode} onChange={(e) => setEditCode(e.target.value)} placeholder="Codiguin (ex: BRASIL)" style={{ textTransform: 'uppercase', maxWidth: '180px' }} />
                   <button className={styles.iconBtnOk} onClick={() => saveEdit(inf.id)} title="Salvar"><Check size={16} /></button>
                   <button className={styles.iconBtn} onClick={() => setEditId(null)} title="Cancelar"><X size={16} /></button>
                 </div>
@@ -151,6 +166,7 @@ export default function InfluencerManager() {
                     <div className={styles.rowName}>{inf.name}</div>
                     <div className={styles.rowMeta}>
                       <span className={styles.slugChip}>/{inf.slug}</span>
+                      {inf.roblox_code && <span className={styles.codeChip}>🎟️ {inf.roblox_code}</span>}
                       {inf.video_url
                         ? <span className={styles.videoOk}>🎬 vídeo próprio</span>
                         : <span className={styles.videoDefault}>vídeo padrão</span>}
