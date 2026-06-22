@@ -87,6 +87,18 @@ export default function AdminDashboard() {
     ? allData
     : allData.filter(d => (d.influencer || '').toLowerCase() === selectedInfluencer);
 
+  // Quando filtra por influenciador, mostra só os codiguins DELE (ex: mila -> MILA, spawnin -> BRASIL)
+  const selectedCodes = selectedInfluencer === 'all'
+    ? null
+    : new Set(
+        influencers
+          .filter(inf => inf.slug === selectedInfluencer && inf.roblox_code)
+          .map(inf => (inf.roblox_code as string).toUpperCase())
+      );
+  const usagesView = selectedCodes
+    ? couponUsages.filter(u => selectedCodes.has((u.coupon_code || '').toUpperCase()))
+    : couponUsages;
+
   const [dateRange, setDateRange] = useState<{start: Date, end: Date}>(() => {
     const now = new Date();
     return {
@@ -261,7 +273,7 @@ export default function AdminDashboard() {
     b.acessos += 1;
     if (row.click_link) b.conversoes += 1;
   });
-  couponUsages.forEach(u => {
+  usagesView.forEach(u => {
     if (!u.used_at) return;
     const dt = new Date(u.used_at);
     const k = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
@@ -329,9 +341,9 @@ export default function AdminDashboard() {
   );
 
   // --- CONVERSÃO FINAL NO ROBLOX (resgates de codiguin no período) ---
-  const robloxTotal = couponUsages.length;
+  const robloxTotal = usagesView.length;
   const usageByCode: Record<string, number> = {};
-  couponUsages.forEach(u => {
+  usagesView.forEach(u => {
     const c = (u.coupon_code || '').toUpperCase();
     if (c) usageByCode[c] = (usageByCode[c] || 0) + 1;
   });
@@ -342,7 +354,11 @@ export default function AdminDashboard() {
       (codeToInfluencers[c] = codeToInfluencers[c] || []).push(inf.name);
     }
   });
-  const robloxBreakdown = Array.from(new Set([...Object.keys(usageByCode), ...Object.keys(codeToInfluencers)]))
+  // Quando filtra por influenciador, só os códigos DELE entram no ranking de codiguins
+  const codeUniverse = selectedCodes
+    ? Array.from(selectedCodes)
+    : Array.from(new Set([...Object.keys(usageByCode), ...Object.keys(codeToInfluencers)]));
+  const robloxBreakdown = codeUniverse
     .map(code => ({ code, count: usageByCode[code] || 0, influencers: codeToInfluencers[code] || [] }))
     .sort((a, b) => b.count - a.count);
 
