@@ -2,13 +2,15 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { listInfluencers, Influencer } from '../../lib/influencers';
+import { fetchMetaSpendPorDia } from '../../lib/metaAds';
 import styles from './AdminDashboard.module.css';
 import CustomDatePicker from './CustomDatePicker';
 import InfluencerPicker from './InfluencerPicker';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Bar, Line, Legend } from 'recharts';
 import {
   Users, Eye, Clock, PlayCircle, AlertTriangle, MousePointerClick, BarChart2,
-  Target, Smartphone, Monitor, Tablet, Trophy, Filter, Users2, Link2, TrendingUp, Ticket
+  Target, Smartphone, Monitor, Tablet, Trophy, Filter, Users2, Link2, TrendingUp, Ticket,
+  Info, DollarSign
 } from 'lucide-react';
 
 const KpiCard = ({ title, value, subtitle, icon: Icon, color = "#a855f7", highlight = false }: any) => (
@@ -32,6 +34,21 @@ const KpiCard = ({ title, value, subtitle, icon: Icon, color = "#a855f7", highli
     {subtitle && <div className={styles.kpiCompare}>{subtitle}</div>}
   </div>
 );
+
+// Formata R$ (BRL)
+const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+// Dia no fuso de São Paulo ('YYYY-MM-DD') — mesmo fuso do date_start do Meta, pra o gasto
+// bater com os acessos/conversões do mesmo dia, independente do fuso do navegador.
+const diaSP = (d: Date) => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+}).format(d);
+
+// Linha de status do gasto (Meta) — o gasto e os custos POR DIA aparecem no balão do gráfico.
+const spendNoteStyle: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+  fontSize: 12.5, color: '#8b8b93', margin: '10px 0 2px',
+};
 
 // Cores de cada dispositivo no donut
 const DEVICE_META: Record<string, { label: string; color: string; icon: any }> = {
@@ -58,9 +75,37 @@ function ConversionTooltip({ active, payload, label }: any) {
   return (
     <div className={styles.convTooltip}>
       <div className={styles.convTooltipDay}>{label}</div>
-      <div className={styles.convTooltipRow}><span>Acessos</span><b>{row.acessos ?? 0}</b></div>
-      <div className={styles.convTooltipRow} style={{ color: '#22c55e' }}><span>Conversões (LP)</span><b>{row.conversoes ?? 0}</b></div>
-      <div className={styles.convTooltipRow} style={{ color: '#f59e0b' }}><span>Resgates (Roblox)</span><b>{row.resgates ?? 0}</b></div>
+      {row.gastoAtivo ? (
+        // Grid de 3 colunas (métrica | contagem | custo) com divisor vertical contínuo e header "custos".
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', columnGap: 12 }}>
+          <span />
+          <span />
+          <span style={{ borderLeft: '1px solid #3a3a45', paddingLeft: 12, paddingBottom: 5, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.05em', color: '#8b8b93', textAlign: 'right' }}>custos</span>
+
+          <span style={{ paddingTop: 5 }}>Acessos</span>
+          <b style={{ paddingTop: 5, textAlign: 'right' }}>{row.acessos ?? 0}</b>
+          <b style={{ paddingTop: 5, paddingLeft: 12, borderLeft: '1px solid #3a3a45', textAlign: 'right', color: '#c084fc' }}>{brl(row.custoAcesso ?? 0)}</b>
+
+          <span style={{ paddingTop: 5, color: '#22c55e' }}>Conversões (LP)</span>
+          <b style={{ paddingTop: 5, textAlign: 'right', color: '#22c55e' }}>{row.conversoes ?? 0}</b>
+          <b style={{ paddingTop: 5, paddingLeft: 12, borderLeft: '1px solid #3a3a45', textAlign: 'right', color: '#00e5ff' }}>{brl(row.custoConversao ?? 0)}</b>
+
+          <span style={{ paddingTop: 5, color: '#f59e0b' }}>Resgates (Roblox)</span>
+          <b style={{ paddingTop: 5, textAlign: 'right', color: '#f59e0b' }}>{row.resgates ?? 0}</b>
+          <b style={{ paddingTop: 5, paddingLeft: 12, borderLeft: '1px solid #3a3a45', textAlign: 'right', color: '#f59e0b' }}>{brl(row.custoResgate ?? 0)}</b>
+        </div>
+      ) : (
+        <>
+          <div className={styles.convTooltipRow}><span>Acessos</span><b>{row.acessos ?? 0}</b></div>
+          <div className={styles.convTooltipRow} style={{ color: '#22c55e' }}><span>Conversões (LP)</span><b>{row.conversoes ?? 0}</b></div>
+          <div className={styles.convTooltipRow} style={{ color: '#f59e0b' }}><span>Resgates (Roblox)</span><b>{row.resgates ?? 0}</b></div>
+        </>
+      )}
+      {row.gastoAtivo && (
+        <div className={styles.convTooltipCodes}>
+          <div className={styles.convTooltipRow} style={{ color: '#22c55e' }}><span>Gasto no dia</span><b>{brl(row.gasto ?? 0)}</b></div>
+        </div>
+      )}
       {codes.length > 0 && (
         <div className={styles.convTooltipCodes}>
           {codes.map(([c, n]: any) => (
@@ -77,6 +122,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   // Resgates de cupom no Roblox (espelhados da API via Edge Function), filtrados pelo período
   const [couponUsages, setCouponUsages] = useState<any[]>([]);
+  // Gasto de anúncio (Meta) do período — respeita o filtro de influencer (via ad_prefix)
+  const [metaSpend, setMetaSpend] = useState<{ configurado: boolean; erro: string | null; porDia: Record<string, number>; total: number; semPrefixo?: boolean } | null>(null);
 
   // Filtro por influenciador ('all' = todos)
   const [influencers, setInfluencers] = useState<Influencer[]>([]);
@@ -189,6 +236,50 @@ export default function AdminDashboard() {
     })();
   }, [dateRange]);
 
+  // Gasto/custo do Meta — SÓ quando um influenciador está selecionado (usa o ad_prefix dele).
+  // Dispara quando `allData` assenta (1 fetch por período, sem duplicar) e lê dateRange/activeRange
+  // do closure — sempre atuais quando allData chega, já que allData só troca via fetchData.
+  useEffect(() => {
+    if (selectedInfluencer === 'all') { setMetaSpend(null); return; } // custo só por influenciador
+
+    const inf = influencers.find(i => i.slug === selectedInfluencer);
+    const prefixo = inf?.ad_prefix || undefined;
+    if (!prefixo) { setMetaSpend({ configurado: true, erro: null, porDia: {}, total: 0, semPrefixo: true }); return; }
+
+    const rangeSince = diaSP(dateRange.start);
+    const until = diaSP(dateRange.end);
+
+    // No preset "Tudo" arranca do 1º acesso do influenciador (evita puxar período morto);
+    // num período com data definida usa o range inteiro pra não subestimar o gasto.
+    let since = rangeSince;
+    if (activeRange === 'tudo') {
+      let primeiro = '';
+      for (const r of allData) {
+        if (!r.created_at || (r.influencer || '').toLowerCase() !== selectedInfluencer) continue;
+        const day = diaSP(new Date(r.created_at));
+        if (!primeiro || day < primeiro) primeiro = day;
+      }
+      if (primeiro && primeiro > since) since = primeiro;
+    }
+
+    // Meta recusa janela além de ~37 meses (#3018). Clampa em 36; se o período TODO já passou
+    // dessa janela, não há gasto pra puxar — mostra zero, sem erro.
+    const now = new Date();
+    const limite = diaSP(new Date(now.getFullYear(), now.getMonth() - 36, now.getDate()));
+    if (until < limite) { setMetaSpend({ configurado: true, erro: null, porDia: {}, total: 0 }); return; }
+    if (since < limite) since = limite;
+
+    let active = true;
+    setMetaSpend(null);
+    (async () => {
+      const res = await fetchMetaSpendPorDia({ since, until, prefixo });
+      if (!active) return;
+      setMetaSpend({ configurado: res.configurado, erro: res.erro, porDia: res.porDia, total: res.total });
+    })();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allData, selectedInfluencer, influencers]);
+
   // Opções do filtro: cadastrados + quaisquer slugs que apareçam nos dados
   const influencerOptions = (() => {
     const map = new Map<string, string>(); // slug -> nome exibido
@@ -262,22 +353,20 @@ export default function AdminDashboard() {
     .sort((a, b) => b.value - a.value);
 
   // --- TIMELINE DIÁRIA: acessos + conversões (LP) + resgates de codiguin (Roblox) ---
-  const pad2 = (n: number) => String(n).padStart(2, '0');
+  // Bucketiza no fuso de São Paulo (mesmo do date_start do Meta) pra casar com o gasto do dia.
   const dayMap: Record<string, { acessos: number; conversoes: number; codes: Record<string, number> }> = {};
   const ensureDay = (k: string) => (dayMap[k] = dayMap[k] || { acessos: 0, conversoes: 0, codes: {} });
 
   data.forEach(row => {
     if (!row.created_at) return;
-    const dt = new Date(row.created_at);
-    const k = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+    const k = diaSP(new Date(row.created_at));
     const b = ensureDay(k);
     b.acessos += 1;
     if (row.click_link) b.conversoes += 1;
   });
   usagesView.forEach(u => {
     if (!u.used_at) return;
-    const dt = new Date(u.used_at);
-    const k = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+    const k = diaSP(new Date(u.used_at));
     const code = (u.coupon_code || '').toUpperCase();
     if (!code) return;
     const b = ensureDay(k);
@@ -287,7 +376,21 @@ export default function AdminDashboard() {
     const [, m, d] = k.split('-');
     const b = dayMap[k];
     const resgates = Object.values(b.codes).reduce((s, n) => s + n, 0);
-    return { label: `${d}/${m}`, acessos: b.acessos, conversoes: b.conversoes, resgates, codes: b.codes };
+    return { key: k, label: `${d}/${m}`, acessos: b.acessos, conversoes: b.conversoes, resgates, codes: b.codes };
+  });
+
+  // Cruza o GASTO (Meta) de cada dia com a timeline e calcula os custos do dia — vão pro balão.
+  const gastoAtivo = selectedInfluencer !== 'all' && !!(metaSpend && metaSpend.configurado && !metaSpend.semPrefixo && !metaSpend.erro);
+  const timelineComGasto = conversionTimeline.map(row => {
+    const gasto = metaSpend?.porDia?.[row.key] ?? 0;
+    return {
+      ...row,
+      gastoAtivo,
+      gasto,
+      custoAcesso: row.acessos > 0 ? gasto / row.acessos : 0,
+      custoConversao: row.conversoes > 0 ? gasto / row.conversoes : 0,
+      custoResgate: row.resgates > 0 ? gasto / row.resgates : 0,
+    };
   });
 
   // --- ORIGEM / INFLUENCIADORES ---
@@ -571,12 +674,32 @@ export default function AdminDashboard() {
           Conversões ao longo do tempo
         </div>
         <p className={styles.panelSub}>Quantas pessoas foram pro jogo a cada dia (vs. quantas acessaram)</p>
+
+        {/* Gasto/custo do Meta — só quando um influenciador está selecionado. Detalhe por dia no balão. */}
+        {selectedInfluencer !== 'all' && (
+          metaSpend === null ? (
+            <div style={spendNoteStyle}><DollarSign size={14} /> Carregando gasto de anúncios…</div>
+          ) : !metaSpend.configurado ? (
+            <div style={spendNoteStyle}><Info size={14} /> Gasto do Meta não configurado (defina o token no .env.local).</div>
+          ) : metaSpend.semPrefixo ? (
+            <div style={spendNoteStyle}><Info size={14} /> Defina o prefixo de campanha deste influenciador pra ver o gasto atribuído a ele.</div>
+          ) : metaSpend.erro ? (
+            <div style={{ ...spendNoteStyle, color: '#fca5a5' }}><AlertTriangle size={14} /> Meta: {metaSpend.erro}</div>
+          ) : (
+            <div style={spendNoteStyle}>
+              <DollarSign size={14} color="#22c55e" />
+              <span>Investido no período: <b style={{ color: '#22c55e' }}>{brl(metaSpend.total)}</b></span>
+              <span style={{ opacity: 0.65 }}>— custo por acesso/conversão/resgate no balão</span>
+            </div>
+          )
+        )}
+
         {conversionTimeline.length === 0 ? (
           <div className={styles.emptyMini}>Sem dados no período.</div>
         ) : (
           <div style={{ width: '100%', height: 320, marginTop: 12 }}>
             <ResponsiveContainer>
-              <ComposedChart data={conversionTimeline} margin={{ top: 10, right: 16, left: -16, bottom: 0 }}>
+              <ComposedChart data={timelineComGasto} margin={{ top: 10, right: 16, left: -16, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gradAcessos" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#a855f7" stopOpacity={0.95} />

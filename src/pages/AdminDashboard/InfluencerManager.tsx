@@ -4,7 +4,7 @@ import styles from './InfluencerManager.module.css';
 import {
   Influencer, listInfluencers, addInfluencer, updateInfluencer, deleteInfluencer, slugify
 } from '../../lib/influencers';
-import { UserPlus, Link2, Trash2, Pencil, Check, X, BarChart2, Copy, ExternalLink } from 'lucide-react';
+import { UserPlus, Link2, Trash2, Pencil, Check, X, BarChart2, Copy, ExternalLink, Megaphone } from 'lucide-react';
 
 const ORIGIN = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -18,6 +18,7 @@ export default function InfluencerManager() {
   const [robloxCode, setRobloxCode] = useState('');
   const [unlockSeconds, setUnlockSeconds] = useState(''); // vazio=75% padrão, 0=libera já, N=segundos
   const [redirectUrl, setRedirectUrl] = useState('');     // vazio=link padrão da LP
+  const [adPrefix, setAdPrefix] = useState('');           // ex: [ROBLOX] [HANZO] — atribui gasto do Meta
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +29,7 @@ export default function InfluencerManager() {
   const [editCode, setEditCode] = useState('');
   const [editUnlock, setEditUnlock] = useState('');
   const [editRedirect, setEditRedirect] = useState('');
+  const [editAdPrefix, setEditAdPrefix] = useState('');
 
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -46,10 +48,10 @@ export default function InfluencerManager() {
     setError(null);
     if (!name.trim()) { setError('Coloque o nome do influenciador.'); return; }
     setSaving(true);
-    const { error } = await addInfluencer({ name, videoUrl, robloxCode, unlockSeconds, redirectUrl });
+    const { error } = await addInfluencer({ name, videoUrl, robloxCode, unlockSeconds, redirectUrl, adPrefix });
     setSaving(false);
     if (error) { setError(error); return; }
-    setName(''); setVideoUrl(''); setRobloxCode(''); setUnlockSeconds(''); setRedirectUrl('');
+    setName(''); setVideoUrl(''); setRobloxCode(''); setUnlockSeconds(''); setRedirectUrl(''); setAdPrefix('');
     load();
   };
 
@@ -60,12 +62,13 @@ export default function InfluencerManager() {
     setEditCode(inf.roblox_code || '');
     setEditUnlock(inf.unlock_seconds == null ? '' : String(inf.unlock_seconds));
     setEditRedirect(inf.redirect_url || '');
+    setEditAdPrefix(inf.ad_prefix || '');
   };
 
   const saveEdit = async (id: string) => {
     const { error } = await updateInfluencer(id, {
       name: editName, videoUrl: editVideo, robloxCode: editCode,
-      unlockSeconds: editUnlock, redirectUrl: editRedirect,
+      unlockSeconds: editUnlock, redirectUrl: editRedirect, adPrefix: editAdPrefix,
     });
     if (error) { setError(error); return; }
     setEditId(null);
@@ -157,6 +160,16 @@ export default function InfluencerManager() {
             />
             <span className={styles.hint}>Pra onde o botão leva ao liberar. Se vazio, usa o link padrão da LP.</span>
           </div>
+          <div className={styles.field}>
+            <label>Prefixo de campanha — anúncios (opcional)</label>
+            <input
+              type="text"
+              placeholder="Ex: ROBLOX HANZO"
+              value={adPrefix}
+              onChange={(e) => setAdPrefix(e.target.value)}
+            />
+            <span className={styles.hint}>Tag no nome das campanhas do Meta deste influencer — pode ser <strong>sem colchetes</strong> (ex: <strong>ROBLOX</strong>). Atribui o gasto/custo no dashboard ao filtrar por ele.</span>
+          </div>
         </div>
 
         {error && <div className={styles.error}>{error}</div>}
@@ -188,6 +201,7 @@ export default function InfluencerManager() {
                   <input className={styles.editInput} value={editCode} onChange={(e) => setEditCode(e.target.value)} placeholder="Codiguin (ex: BRASIL)" style={{ textTransform: 'uppercase', maxWidth: '180px' }} />
                   <input className={styles.editInput} type="number" min={0} value={editUnlock} onChange={(e) => setEditUnlock(e.target.value)} placeholder="Seg (0=já)" style={{ maxWidth: '120px' }} title="Segundos até liberar (vazio=75%, 0=libera já)" />
                   <input className={styles.editInput} value={editRedirect} onChange={(e) => setEditRedirect(e.target.value)} placeholder="Link redirect (vazio=padrão)" title="Link de redirecionamento do botão" />
+                  <input className={styles.editInput} value={editAdPrefix} onChange={(e) => setEditAdPrefix(e.target.value)} placeholder="Prefixo campanha (ex: ROBLOX HANZO)" title="Prefixo de campanha de anúncios (pode ser sem colchetes)" />
                   <button className={styles.iconBtnOk} onClick={() => saveEdit(inf.id)} title="Salvar"><Check size={16} /></button>
                   <button className={styles.iconBtn} onClick={() => setEditId(null)} title="Cancelar"><X size={16} /></button>
                 </div>
@@ -206,6 +220,7 @@ export default function InfluencerManager() {
                         <span className={styles.codeChip}>⏱️ {inf.unlock_seconds === 0 ? 'libera já' : `${inf.unlock_seconds}s`}</span>
                       )}
                       {inf.redirect_url && <span className={styles.codeChip}>🔗 link próprio</span>}
+                      {inf.ad_prefix && <span className={styles.codeChip} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Megaphone size={12} /> {inf.ad_prefix}</span>}
                     </div>
                   </div>
                   <div className={styles.rowActions}>

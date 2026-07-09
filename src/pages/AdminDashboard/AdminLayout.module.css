@@ -1,0 +1,179 @@
+.shell {
+  --nav-w: 232px;
+  --nav-w-rail: 68px;
+  --accent: #a855f7;
+  min-height: 100vh;
+  background: #0b0b0f;
+}
+
+/* ===== Sidebar: recolhida por padrão, EXPANDE ao passar o mouse (overlay) ===== */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--nav-w-rail);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px;
+  gap: 8px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #14141a 0%, #101015 100%);
+  border-right: 1px solid #26262e;
+  z-index: 50;
+  transition: width 0.2s ease, box-shadow 0.2s ease;
+}
+.sidebar:hover {
+  width: var(--nav-w);
+  box-shadow: 8px 0 34px rgba(0, 0, 0, 0.5);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px 14px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #26262e;
+}
+.brandMark {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 14px;
+  color: #fff;
+  background: linear-gradient(145deg, #a855f7, #7c3aed);
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35);
+}
+.brandName {
+  font-weight: 700;
+  color: #fff;
+  font-size: 15px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.sidebar:hover .brandName { opacity: 1; }
+
+/* ===== Nav items ===== */
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: none;
+  color: #a1a1aa;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.item:hover {
+  background: #1d1d25;
+  color: #e4e4e7;
+}
+.item.active {
+  color: #fff;
+  background: linear-gradient(145deg, rgba(168, 85, 247, 0.22), rgba(124, 58, 237, 0.1));
+  border-color: rgba(168, 85, 247, 0.45);
+}
+.itemIcon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+}
+.item.active .itemIcon { color: var(--accent); }
+.itemLabel {
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.sidebar:hover .itemLabel { opacity: 1; }
+
+/* ===== Área de conteúdo (não se mexe no hover — a barra sobrepõe) ===== */
+.content {
+  margin-left: var(--nav-w-rail);
+  min-height: 100vh;
+}
+
+/* ===== Só mobile ===== */
+.hamburger,
+.mobileClose,
+.backdrop { display: none; }
+
+@media (max-width: 860px) {
+  .sidebar {
+    width: var(--nav-w) !important;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    box-shadow: none;
+  }
+  .sidebar:hover { box-shadow: none; } /* sem hover-expand no touch */
+  .mobileOpen .sidebar {
+    transform: translateX(0);
+    box-shadow: 8px 0 34px rgba(0, 0, 0, 0.5);
+  }
+
+  .content {
+    margin-left: 0 !important;
+    padding-top: 60px; /* espaço pro hamburguer flutuante */
+  }
+
+  .brandName,
+  .itemLabel { opacity: 1 !important; } /* no overlay sempre mostra o texto */
+
+  .hamburger {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 30;
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: #14141a;
+    border: 1px solid #26262e;
+    color: #e4e4e7;
+    cursor: pointer;
+  }
+  .mobileClose {
+    display: grid;
+    place-items: center;
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #a1a1aa;
+    cursor: pointer;
+  }
+  .backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .mobileOpen .backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}

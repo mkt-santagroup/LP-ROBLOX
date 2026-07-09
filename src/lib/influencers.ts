@@ -13,6 +13,9 @@ export interface Influencer {
   unlock_seconds: number | null;
   // Link de destino do botão pra este influencer (null/vazio = usa o link padrão da LP)
   redirect_url: string | null;
+  // Tag das campanhas de anúncio deste influencer (ex: "[ROBLOX] [HANZO]"). Usado pra
+  // atribuir gasto/custo do Meta no dashboard. null/vazio = sem campanha própria.
+  ad_prefix: string | null;
   created_at?: string;
 }
 
@@ -23,6 +26,7 @@ export interface InfluencerInput {
   robloxCode?: string;
   unlockSeconds?: number | string | null; // aceita string vinda do input; normalizeUnlockSeconds resolve
   redirectUrl?: string;
+  adPrefix?: string;
 }
 
 // Padroniza o codiguin (MAIÚSCULO, sem espaços) pra bater com a API do Roblox
@@ -97,6 +101,7 @@ function buildPayload(input: InfluencerInput, slug: string) {
     roblox_code: normalizeCode(input.robloxCode || ''),
     unlock_seconds: normalizeUnlockSeconds(input.unlockSeconds),
     redirect_url: normalizeUrl(input.redirectUrl),
+    ad_prefix: (input.adPrefix ?? '').trim() || null,
   };
 }
 
