@@ -16,6 +16,8 @@ export default function InfluencerManager() {
   const [name, setName] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [robloxCode, setRobloxCode] = useState('');
+  const [unlockSeconds, setUnlockSeconds] = useState(''); // vazio=75% padrão, 0=libera já, N=segundos
+  const [redirectUrl, setRedirectUrl] = useState('');     // vazio=link padrão da LP
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,6 +26,8 @@ export default function InfluencerManager() {
   const [editName, setEditName] = useState('');
   const [editVideo, setEditVideo] = useState('');
   const [editCode, setEditCode] = useState('');
+  const [editUnlock, setEditUnlock] = useState('');
+  const [editRedirect, setEditRedirect] = useState('');
 
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -42,10 +46,10 @@ export default function InfluencerManager() {
     setError(null);
     if (!name.trim()) { setError('Coloque o nome do influenciador.'); return; }
     setSaving(true);
-    const { error } = await addInfluencer(name, videoUrl, robloxCode);
+    const { error } = await addInfluencer({ name, videoUrl, robloxCode, unlockSeconds, redirectUrl });
     setSaving(false);
     if (error) { setError(error); return; }
-    setName(''); setVideoUrl(''); setRobloxCode('');
+    setName(''); setVideoUrl(''); setRobloxCode(''); setUnlockSeconds(''); setRedirectUrl('');
     load();
   };
 
@@ -54,10 +58,15 @@ export default function InfluencerManager() {
     setEditName(inf.name);
     setEditVideo(inf.video_url || '');
     setEditCode(inf.roblox_code || '');
+    setEditUnlock(inf.unlock_seconds == null ? '' : String(inf.unlock_seconds));
+    setEditRedirect(inf.redirect_url || '');
   };
 
   const saveEdit = async (id: string) => {
-    const { error } = await updateInfluencer(id, editName, editVideo, editCode);
+    const { error } = await updateInfluencer(id, {
+      name: editName, videoUrl: editVideo, robloxCode: editCode,
+      unlockSeconds: editUnlock, redirectUrl: editRedirect,
+    });
     if (error) { setError(error); return; }
     setEditId(null);
     load();
@@ -127,6 +136,27 @@ export default function InfluencerManager() {
             />
             <span className={styles.hint}>Código do cupom no jogo — mede a conversão final no Roblox.</span>
           </div>
+          <div className={styles.field}>
+            <label>Segundos até liberar o botão (opcional)</label>
+            <input
+              type="number"
+              min={0}
+              placeholder="Ex: 15"
+              value={unlockSeconds}
+              onChange={(e) => setUnlockSeconds(e.target.value)}
+            />
+            <span className={styles.hint}>Tempo de vídeo assistido até o botão liberar. <strong>0</strong> = liberado de início. Vazio = regra padrão (75% do vídeo).</span>
+          </div>
+          <div className={styles.field}>
+            <label>Link de redirecionamento (opcional)</label>
+            <input
+              type="text"
+              placeholder="https://www.roblox.com/games/..."
+              value={redirectUrl}
+              onChange={(e) => setRedirectUrl(e.target.value)}
+            />
+            <span className={styles.hint}>Pra onde o botão leva ao liberar. Se vazio, usa o link padrão da LP.</span>
+          </div>
         </div>
 
         {error && <div className={styles.error}>{error}</div>}
@@ -156,6 +186,8 @@ export default function InfluencerManager() {
                   <input className={styles.editInput} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Nome" />
                   <input className={styles.editInput} value={editVideo} onChange={(e) => setEditVideo(e.target.value)} placeholder="URL do vídeo" />
                   <input className={styles.editInput} value={editCode} onChange={(e) => setEditCode(e.target.value)} placeholder="Codiguin (ex: BRASIL)" style={{ textTransform: 'uppercase', maxWidth: '180px' }} />
+                  <input className={styles.editInput} type="number" min={0} value={editUnlock} onChange={(e) => setEditUnlock(e.target.value)} placeholder="Seg (0=já)" style={{ maxWidth: '120px' }} title="Segundos até liberar (vazio=75%, 0=libera já)" />
+                  <input className={styles.editInput} value={editRedirect} onChange={(e) => setEditRedirect(e.target.value)} placeholder="Link redirect (vazio=padrão)" title="Link de redirecionamento do botão" />
                   <button className={styles.iconBtnOk} onClick={() => saveEdit(inf.id)} title="Salvar"><Check size={16} /></button>
                   <button className={styles.iconBtn} onClick={() => setEditId(null)} title="Cancelar"><X size={16} /></button>
                 </div>
@@ -170,6 +202,10 @@ export default function InfluencerManager() {
                       {inf.video_url
                         ? <span className={styles.videoOk}>🎬 vídeo próprio</span>
                         : <span className={styles.videoDefault}>vídeo padrão</span>}
+                      {typeof inf.unlock_seconds === 'number' && (
+                        <span className={styles.codeChip}>⏱️ {inf.unlock_seconds === 0 ? 'libera já' : `${inf.unlock_seconds}s`}</span>
+                      )}
+                      {inf.redirect_url && <span className={styles.codeChip}>🔗 link próprio</span>}
                     </div>
                   </div>
                   <div className={styles.rowActions}>

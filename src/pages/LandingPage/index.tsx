@@ -10,7 +10,8 @@ import { getInfluencerBySlug, slugify } from '../../lib/influencers';
 import styles from '../../App.module.css';
 import { useRobloxAnalytics } from '../../hooks/useRobloxAnalytics';
 
-// Libera o botão quando a pessoa assistiu acima de 75% do VÍDEO REAL
+// Regra PADRÃO (LP principal / influencer sem segundos definidos):
+// libera quando a pessoa assistiu acima de 75% do VÍDEO REAL
 // (detecta a duração automaticamente, sem timer fixo).
 const UNLOCK_PERCENT = 75;
 
@@ -32,12 +33,25 @@ export const LandingPage = () => {
     let active = true;
     (async () => {
       const base = await getMockData();
-      // Se a rota tem influenciador cadastrado, usa o vídeo DELE
+      // Se a rota tem influenciador cadastrado, aplica as configs DELE:
+      // vídeo próprio, segundos até liberar o botão e link de redirect.
       if (influencer) {
         const inf = await getInfluencerBySlug(slugify(influencer));
-        if (inf?.video_url) base.videoUrl = inf.video_url;
+        if (inf) {
+          if (inf.video_url) base.videoUrl = inf.video_url;
+          base.unlockSeconds = inf.unlock_seconds; // null = regra padrão (75%)
+          if (inf.redirect_url && inf.redirect_url.trim()) base.redirectUrl = inf.redirect_url.trim();
+        }
       }
-      if (active) setData(base);
+      if (active) {
+        setData(base);
+        // unlock_seconds === 0 -> botão liberado desde o início (sem gate de vídeo)
+        if (base.unlockSeconds === 0) {
+          setState('unlocked');
+          setLabel('JOGAR AGORA');
+          setVideoProgress(100); // barra cheia/verde já na entrada
+        }
+      }
     })();
     return () => { active = false; };
   }, [influencer]);
@@ -49,12 +63,24 @@ export const LandingPage = () => {
     if (!video) return;
 
     const onTime = () => {
-      if (!video.duration || isNaN(video.duration)) return;
-      const pct = Math.min((video.currentTime / video.duration) * 100, 100);
+      const dur = video.duration;
+      if (!dur || isNaN(dur)) return;
+
+      // Alvo em SEGUNDOS de vídeo assistido até liberar o botão:
+      //   unlockSeconds == null -> regra padrão (75% da duração do vídeo)
+      //   unlockSeconds  > 0    -> segundos definidos pelo influencer
+      //   (unlockSeconds === 0 já foi liberado de início, sem passar por aqui)
+      const unlockSeconds = data?.unlockSeconds;
+      const targetSecs = unlockSeconds == null
+        ? dur * (UNLOCK_PERCENT / 100)
+        : unlockSeconds;
+
+      // progresso 0-100 RUMO ao desbloqueio (a barra chega em 100% no instante de liberar)
+      const pct = targetSecs > 0 ? Math.min((video.currentTime / targetSecs) * 100, 100) : 100;
       videoProgressRef.current = Math.max(videoProgressRef.current, pct);
       setVideoProgress(prev => Math.max(prev, pct));
 
-      if (videoProgressRef.current >= UNLOCK_PERCENT && state !== 'unlocked' && state !== 'blocked') {
+      if (videoProgressRef.current >= 100 && state !== 'unlocked' && state !== 'blocked') {
         setState('unlocked');
         setLabel('JOGAR AGORA');
       }
@@ -81,14 +107,15 @@ export const LandingPage = () => {
       trackLinkClick();
       // Pequeno delay pro GTM/pixel disparar a conversão (entrou_no_jogo) ANTES
       // do redirect pro Roblox — senão a navegação pode cancelar o envio do evento.
-      setTimeout(() => { window.location.href = data?.gameUrl; }, 350);
+      // redirectUrl = link custom do influencer; fallback pro link padrão da LP.
+      setTimeout(() => { window.location.href = data?.redirectUrl || data?.gameUrl; }, 350);
     } else if (state === 'watching') {
       trackBlockedClick();
       setState('blocked');
       setLabel('CALMAAA...');
       
       setTimeout(() => {
-        if (videoProgressRef.current >= UNLOCK_PERCENT) {
+        if (videoProgressRef.current >= 100) {
           setState('unlocked');
           setLabel('JOGAR AGORA');
         } else {

@@ -6,13 +6,47 @@ export interface Influencer {
   name: string;
   video_url: string | null;
   roblox_code: string | null; // codiguin do cupom no Roblox (ex: BRASIL, MILA)
+  // Segundos de VÍDEO assistido até o botão liberar:
+  //   null = não configurado (usa a regra padrão de 75% do vídeo)
+  //   0    = liberado desde o início
+  //   N>0  = libera após N segundos assistidos
+  unlock_seconds: number | null;
+  // Link de destino do botão pra este influencer (null/vazio = usa o link padrão da LP)
+  redirect_url: string | null;
   created_at?: string;
+}
+
+// Dados editáveis de um influencer (form de novo/edição)
+export interface InfluencerInput {
+  name: string;
+  videoUrl?: string;
+  robloxCode?: string;
+  unlockSeconds?: number | string | null; // aceita string vinda do input; normalizeUnlockSeconds resolve
+  redirectUrl?: string;
 }
 
 // Padroniza o codiguin (MAIÚSCULO, sem espaços) pra bater com a API do Roblox
 export function normalizeCode(code: string): string | null {
   const c = (code || '').trim().toUpperCase().replace(/\s+/g, '');
   return c.length > 0 ? c : null;
+}
+
+// Converte o input de segundos do form em número (ou null quando vazio).
+// '' -> null (usa a regra padrão de 75%). '0' -> 0 (libera de início).
+// Negativos/invalidos viram null pra não travar o cadastro.
+export function normalizeUnlockSeconds(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const s = String(value).trim();
+  if (s === '') return null;
+  const n = Math.floor(Number(s));
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+// Normaliza uma URL de redirect: vazio -> null.
+export function normalizeUrl(value?: string): string | null {
+  const v = (value || '').trim();
+  return v.length > 0 ? v : null;
 }
 
 // Transforma "Nathan Silva" -> "nathan-silva" (sem acento, minúsculo, hífens)
@@ -54,14 +88,26 @@ export async function listInfluencers(): Promise<Influencer[]> {
   return data || [];
 }
 
-// Adiciona um influenciador (nome + vídeo + codiguin). Retorna { error } se o slug já existir.
-export async function addInfluencer(name: string, videoUrl: string, robloxCode: string = ''): Promise<{ data: Influencer | null; error: string | null }> {
-  const slug = slugify(name);
+// Monta o payload que vai pro banco a partir do input do form.
+function buildPayload(input: InfluencerInput, slug: string) {
+  return {
+    slug,
+    name: input.name.trim(),
+    video_url: normalizeUrl(input.videoUrl),
+    roblox_code: normalizeCode(input.robloxCode || ''),
+    unlock_seconds: normalizeUnlockSeconds(input.unlockSeconds),
+    redirect_url: normalizeUrl(input.redirectUrl),
+  };
+}
+
+// Adiciona um influenciador. Retorna { error } se o slug já existir.
+export async function addInfluencer(input: InfluencerInput): Promise<{ data: Influencer | null; error: string | null }> {
+  const slug = slugify(input.name);
   if (!slug) return { data: null, error: 'Nome inválido.' };
 
   const { data, error } = await supabase
     .from('lp_influencers')
-    .insert([{ slug, name: name.trim(), video_url: videoUrl.trim() || null, roblox_code: normalizeCode(robloxCode) }])
+    .insert([buildPayload(input, slug)])
     .select()
     .single();
 
@@ -72,13 +118,13 @@ export async function addInfluencer(name: string, videoUrl: string, robloxCode: 
   return { data, error: null };
 }
 
-// Atualiza nome/vídeo/codiguin de um influenciador existente
-export async function updateInfluencer(id: string, name: string, videoUrl: string, robloxCode: string = ''): Promise<{ error: string | null }> {
-  const slug = slugify(name);
+// Atualiza um influenciador existente
+export async function updateInfluencer(id: string, input: InfluencerInput): Promise<{ error: string | null }> {
+  const slug = slugify(input.name);
   if (!slug) return { error: 'Nome inválido.' };
   const { error } = await supabase
     .from('lp_influencers')
-    .update({ slug, name: name.trim(), video_url: videoUrl.trim() || null, roblox_code: normalizeCode(robloxCode) })
+    .update(buildPayload(input, slug))
     .eq('id', id);
   if (error) {
     if (error.code === '23505') return { error: `Já existe um influenciador com o link /${slug}.` };
