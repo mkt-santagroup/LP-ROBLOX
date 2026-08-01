@@ -660,6 +660,8 @@
   text-transform: capitalize;
 }
 .codeInf em { color: #6b6b73; font-style: normal; }
+/* Empurra a contagem pra direita da linha do codiguin */
+.rankSpacer { flex: 1; }
 .codeCount {
   font-size: 24px;
   font-weight: 800;
@@ -906,7 +908,142 @@
 }
 
 .chartWrapper {
-  flex: 1; 
+  flex: 1;
   width: 100%;
   min-height: 300px;
+}
+
+/* =====================================================================
+   MOBILE / TABLET
+   O dashboard foi desenhado pra tela larga: quase tudo aqui é linha
+   horizontal com larguras fixas. No celular essas linhas viram blocos
+   empilhados e as larguras fixas viram `auto`, senão o conteúdo estoura
+   pra fora e a página ganha scroll horizontal.
+   ===================================================================== */
+
+/* Impede que qualquer bloco largo (tabela, gráfico) crie rolagem lateral */
+@media (max-width: 1024px) {
+  .container { overflow-x: hidden; }
+}
+
+@media (max-width: 900px) {
+  .container { padding: 20px 16px 40px; }
+
+  /* Cabeçalho: título em cima, filtros embaixo ocupando a largura toda */
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 18px;
+    margin-bottom: 24px;
+  }
+  .titleArea h1 { font-size: 24px; }
+  .titleArea p { font-size: 13px; }
+
+  .controlsCol { align-items: stretch; gap: 12px; }
+  .controlsArea {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .inputGroup { width: 100%; }
+  /* O label vazio (&nbsp;) que alinhava o botão no desktop só ocupa espaço aqui */
+  .inputGroup label:empty { display: none; }
+  .manageBtn { justify-content: center; padding: 13px 18px; }
+  .influencerSelect { min-width: 0; width: 100%; }
+
+  /* Pills de período: rolagem horizontal só nelas, sem quebrar em 2 linhas */
+  .quickBar {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .quickBar::-webkit-scrollbar { display: none; }
+  .quickPill { flex-shrink: 0; padding: 9px 15px; }
+
+  .sectionHeader { font-size: 13px; margin-bottom: 14px; }
+
+  /* KPIs: 2 por linha ainda cabem e ficam legíveis */
+  .kpiGrid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+  .kpiCard { padding: 16px 14px; gap: 10px; }
+  .kpiCard:hover { transform: none; } /* hover não faz sentido no toque */
+  .kpiTitle { font-size: 10px; }
+  .kpiValue { font-size: 22px; margin-top: 6px; }
+  .kpiIcon { padding: 7px; }
+  .kpiIcon svg { width: 18px; height: 18px; }
+  .kpiCompare { font-size: 11px; line-height: 1.4; }
+
+  .secondaryStrip { gap: 10px; margin-bottom: 28px; }
+  .miniStat { padding: 15px 16px; gap: 13px; }
+  .miniStatIcon { width: 40px; height: 40px; border-radius: 10px; }
+  .miniStatValue { font-size: 24px; }
+  .miniStatLabel { font-size: 12px; }
+
+  .panel { padding: 16px 14px; margin-bottom: 26px; }
+  .funnelChartGrid { gap: 12px; margin-bottom: 26px; }
+  .chartCard { padding: 16px 14px; min-height: 360px; }
+  .chartWrapper { min-height: 240px; }
+  .cardHeader { margin-bottom: 16px; }
+  .cardTitle { font-size: 15px; }
+
+  /* Funil: rótulo e barra empilhados pra a barra ter largura de verdade */
+  .funnelBarTrack { flex-direction: column; align-items: stretch; gap: 4px; }
+  .funnelBar { height: 26px; }
+  .funnelPct { text-align: right; font-size: 11px; }
+  .funnelLabel { font-size: 12.5px; }
+  .funnelDrop { font-size: 10px; padding: 2px 6px; }
+  .funnelInfo { flex-wrap: wrap; gap: 6px; }
+
+  /* Dispositivos: donut em cima, barras embaixo */
+  .deviceRow { flex-direction: column; gap: 22px; }
+  .donutWrap { width: 100%; max-width: 220px; align-self: center; }
+  .deviceBars { width: 100%; padding-right: 0; gap: 16px; }
+  .deviceBarRow { flex-wrap: wrap; gap: 10px; }
+  .deviceBarIcon { width: 34px; height: 34px; }
+  .deviceBarLabel { width: auto; flex: 1; }
+  .deviceBarName { font-size: 13px; }
+  /* A barra vai pra linha de baixo, ocupando toda a largura */
+  .deviceBarTrack { order: 4; flex-basis: 100%; }
+  .deviceBarPct { width: auto; font-size: 17px; }
+
+  .originSummary { flex-direction: column; gap: 6px; margin-bottom: 16px; font-size: 12.5px; }
+
+  /* Ranking: cabeçalho do card vira grade de 2 linhas */
+  .rankCard { padding: 16px 14px; }
+  .rankCardHead { flex-wrap: wrap; gap: 12px; }
+  .rankPos { width: 32px; height: 32px; font-size: 12.5px; }
+  .rankIdentity { flex: 1 1 auto; min-width: 0; }
+  .rankName { font-size: 15px; }
+  .rankMeta { flex-wrap: wrap; gap: 10px; font-size: 11.5px; }
+  /* KPIs do card descem pra uma linha própria, divididos ao meio */
+  .rankKpi { flex: 1 1 0; min-width: 0; text-align: left; }
+  .rankKpiVal { font-size: 19px; }
+  .rankKpiLabel { font-size: 10px; }
+  .rankKpiDivider { height: 28px; }
+
+  .socialRow { flex-wrap: wrap; gap: 8px 12px; }
+  .socialRowName { width: auto; flex: 1 1 auto; font-size: 12.5px; }
+  .socialRowUsers { width: auto; font-size: 12.5px; }
+  .socialRowBarTrack { order: 5; flex-basis: 100%; }
+
+  /* Codiguins: nome em cima, número embaixo */
+  .codeRow { flex-wrap: wrap; gap: 8px 12px; padding: 14px 15px; }
+  .codeInf { font-size: 13px; flex: 1 1 100%; }
+  .rankSpacer { display: none; }
+  .codeCount { font-size: 20px; margin-left: auto; }
+
+  /* Balão do gráfico não pode ser mais largo que a tela */
+  .convTooltip { min-width: 0; max-width: calc(100vw - 48px); padding: 10px 12px; }
+  .convTooltipRow { gap: 12px; font-size: 12px; }
+
+  .emptyMini, .originEmpty { padding: 24px 8px; font-size: 13px; }
+}
+
+/* Celulares estreitos: KPIs em coluna única pra o número não quebrar */
+@media (max-width: 420px) {
+  .kpiGrid { grid-template-columns: 1fr; }
+  .container { padding: 16px 12px 32px; }
+  .panel, .chartCard { padding: 14px 12px; }
 }

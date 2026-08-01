@@ -174,3 +174,30 @@
   border-top-right-radius: 8px;
   border-bottom-right-radius: 8px;
 }
+
+/* ===== Mobile ===== */
+@media (max-width: 900px) {
+  .container { width: 100%; }
+
+  /* Sem largura mínima fixa, senão estoura a tela em celular estreito */
+  .triggerBtn {
+    min-width: 0;
+    width: 100%;
+    padding: 13px 15px;
+  }
+
+  /* O calendário ancora nos dois lados e nunca passa da largura da tela */
+  .popover {
+    width: auto;
+    left: 0;
+    right: 0;
+    max-width: none;
+    padding: 14px;
+  }
+
+  /* Dias maiores: 32px era pequeno demais pro dedo */
+  .dayCell { height: 42px; }
+  .dayBtn { width: 38px; height: 38px; font-size: 15px; }
+  .navBtn { padding: 8px; }
+  .weekDays { font-size: 11px; }
+}

@@ -89,3 +89,11 @@
 }
 .card button:hover { opacity: 0.92; }
 .card button:active { transform: scale(0.98); }
+
+@media (max-width: 480px) {
+  .wrap { padding: 20px 16px; }
+  .card { padding: 32px 22px; }
+  .card h1 { font-size: 20px; }
+  /* 16px impede o iOS de dar zoom ao focar o campo de senha */
+  .card input { font-size: 16px; padding: 15px 16px; }
+}

@@ -146,3 +146,24 @@
   color: #8b8b93;
   font-size: 13px;
 }
+
+/* ===== Mobile ===== */
+@media (max-width: 900px) {
+  .wrap { width: 100%; }
+
+  /* min-width fixo estourava a largura da tela em celulares estreitos */
+  .trigger {
+    min-width: 0;
+    width: 100%;
+    padding: 13px 15px;
+    font-size: 14px;
+  }
+
+  /* Lista mais alta: sobra tela no celular e evita rolar dentro de rolagem */
+  .list { max-height: 60vh; }
+  .item { padding: 13px 12px; font-size: 14.5px; }
+  .itemAvatar { width: 30px; height: 30px; font-size: 13px; }
+  /* 16px impede o iOS de dar zoom ao focar a busca */
+  .searchBox { padding: 10px 12px; }
+  .searchBox input { font-size: 16px; }
+}

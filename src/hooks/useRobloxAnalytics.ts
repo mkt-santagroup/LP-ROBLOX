@@ -16,7 +16,10 @@ interface TrackingOrigin {
 }
 
 export function useRobloxAnalytics(
-  videoRef: RefObject<HTMLVideoElement | null>,
+  // `null` = página sem vídeo (a LP de redirecionamento). Todo o tracking de
+  // progresso de vídeo simplesmente não roda, o resto (pageview, conversão)
+  // continua igual.
+  videoRef: RefObject<HTMLVideoElement | null> | null,
   origin?: TrackingOrigin
 ) {
   const visitorId = useRef<string>('');
@@ -56,6 +59,9 @@ export function useRobloxAnalytics(
   // Rede social padronizada em minúsculo (instagram, tiktok, youtube...)
   const rawSocial = cleanSlug(origin?.social)?.toLowerCase() ?? null;
 
+  // Devolve a promise pra quem precisar esperar a gravação terminar antes de
+  // navegar pra fora (a LP de redirect faz isso, com timeout). Nunca lança:
+  // se o banco estiver fora do ar, o tracking falha em silêncio e a página segue.
   const updateSession = async (dataToUpdate: any) => {
     if (!visitorId.current) return;
     try {
@@ -82,6 +88,7 @@ export function useRobloxAnalytics(
     visitorId.current = currentVisitorId;
 
     const initVisitor = async () => {
+      try {
       // --- LOG DE TRACKING (PAGEVIEW) ---
       if (!pageViewFired.current) {
         console.log(`%c[TRACKING] Disparando evento: PageView`, "color: #3b82f6; font-weight: bold;");
@@ -146,14 +153,19 @@ export function useRobloxAnalytics(
 
         await updateSession(updatePayload);
       }
+      } catch (error) {
+        // Banco fora do ar / rede caída: o tracking se perde, mas a página
+        // (e principalmente o redirecionamento) NÃO pode quebrar por causa disso.
+        console.error('[Analytics] Falha ao registrar o visitante:', error);
+      }
     };
 
     initVisitor();
   }, []);
 
   useEffect(() => {
-    const video = videoRef.current;
-    // Se o vídeo ainda não estiver carregado na tela, não faz nada
+    const video = videoRef?.current;
+    // Página sem vídeo (LP de redirect) ou vídeo ainda não montado: nada a fazer.
     if (!video) return;
 
     const handleTimeUpdate = () => {
@@ -193,7 +205,7 @@ export function useRobloxAnalytics(
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('play', markPlayStarted);
     };
-  }, [videoRef, videoRef.current]); // <-- AQUI ESTÁ A MÁGICA: Adicionado videoRef.current de volta!
+  }, [videoRef, videoRef?.current]); // <-- AQUI ESTÁ A MÁGICA: Adicionado videoRef.current de volta!
 
   return {
     // Mantido por compatibilidade — o Play real é marcado pelo evento 'play' do vídeo.
@@ -211,7 +223,9 @@ export function useRobloxAnalytics(
       console.log(`%c[TRACKING] dataLayer -> entrou_no_jogo (CONVERSÃO)`, "color: #22c55e; font-weight: bold;");
       if (window.dataLayer) window.dataLayer.push({ event: 'entrou_no_jogo' });
 
-      updateSession({ click_link: true });
+      // Devolve a promise: a LP de redirect espera (com timeout) pra a gravação
+      // não ser cancelada pela navegação pra fora do site.
+      return updateSession({ click_link: true });
     }
   };
 }

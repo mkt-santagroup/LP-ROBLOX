@@ -1,0 +1,233 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
+
+.container {
+  background-color: #0d0d12;
+  color: #fff;
+  min-height: 100vh;
+  padding: 32px;
+  font-family: 'Montserrat', sans-serif;
+  /* `margin: 0 auto` é o que faltava: sem ele o max-width deixava tudo
+     espremido na esquerda com meia tela preta sobrando no monitor. */
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+/* Linhas que aproveitam a largura no desktop e viram coluna no celular.
+   `minmax(0, …)` evita que um input longo estoure a coluna do grid. */
+.rowSplit,
+.rowHalf {
+  display: grid;
+  gap: 18px;
+  align-items: start;
+}
+.rowSplit { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); }
+.rowHalf { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+@media (max-width: 820px) {
+  .rowSplit,
+  .rowHalf { grid-template-columns: 1fr; gap: 16px; }
+}
+
+.header { margin-bottom: 28px; }
+.titleArea h1 { font-size: 30px; font-weight: 800; margin: 0 0 8px; }
+.titleArea p { color: #8b8b93; font-size: 14px; margin: 0; font-weight: 500; line-height: 1.5; }
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 14px;
+  color: #fff;
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #1f1f27;
+}
+.sectionHeader::before {
+  content: '';
+  width: 4px;
+  height: 15px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #a855f7, #7c3aed);
+}
+
+.card {
+  background-color: #16161b;
+  border: 1px solid #1f1f27;
+  border-radius: 14px;
+  padding: 22px;
+  margin-bottom: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.cardDanger { border-color: #ef444455; background: linear-gradient(145deg, #ef44440d, #16161b 60%); }
+
+/* ===== Status da conexão ===== */
+.statusRow { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.statusRow > div { flex: 1; min-width: 200px; }
+.statusFail { display: flex; flex-direction: column; gap: 16px; }
+.statusDetail { margin: 5px 0 0; font-size: 13px; color: #a1a1aa; line-height: 1.55; font-weight: 500; }
+.okText { color: #22c55e; font-size: 15px; }
+.failText { color: #fca5a5; font-size: 15px; }
+.dotOk {
+  width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+  background: #22c55e; box-shadow: 0 0 0 4px #22c55e26;
+}
+.spin { animation: spin 0.9s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.hintBox {
+  background: #0f0f14;
+  border: 1px solid #2a2a35;
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.hintBox strong { font-size: 13px; color: #fff; }
+.hintBox p { margin: 8px 0 0; font-size: 13px; color: #c9c9d1; line-height: 1.65; }
+.refLine code {
+  color: #a855f7; background: #a855f714; padding: 2px 7px; border-radius: 5px; font-size: 12.5px;
+}
+.hintLink {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 12px;
+  color: #a855f7; font-size: 13px; font-weight: 700; text-decoration: none;
+}
+.hintLink:hover { text-decoration: underline; }
+
+.ghostBtn {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: #1f1f27; border: 1px solid #2a2a35; color: #d4d4d8;
+  padding: 9px 14px; border-radius: 9px;
+  font-family: inherit; font-size: 12.5px; font-weight: 700;
+  cursor: pointer; transition: border-color 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+.ghostBtn:hover { border-color: #a855f7; color: #fff; }
+
+/* ===== Campos ===== */
+.sourceChip {
+  align-self: flex-start;
+  font-size: 12px; font-weight: 600; color: #8b8b93;
+  background: #0f0f14; border: 1px solid #26262f;
+  padding: 6px 12px; border-radius: 999px;
+}
+.sourceChip strong { color: #a855f7; font-weight: 800; }
+
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field label {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; color: #9b9ba3; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+.field input {
+  width: 100%;
+  background: #0f0f14;
+  border: 1px solid #2a2a35;
+  border-radius: 10px;
+  padding: 14px 15px;
+  color: #fff;
+  font-size: 15px; /* >=16px evita zoom automático no iOS; 15 + o ajuste mobile abaixo */
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.field input:focus { border-color: #a855f7; }
+.field input::placeholder { color: #5a5a63; }
+
+.inlineField { display: flex; align-items: center; gap: 10px; }
+.inlineField input { flex: 1; min-width: 0; }
+.unit { font-size: 13.5px; color: #8b8b93; font-weight: 700; flex-shrink: 0; }
+.eyeBtn {
+  display: grid; place-items: center;
+  width: 46px; height: 46px; flex-shrink: 0;
+  background: #1f1f27; border: 1px solid #2a2a35; border-radius: 10px;
+  color: #8b8b93; cursor: pointer; transition: color 0.2s, border-color 0.2s;
+}
+.eyeBtn:hover { color: #fff; border-color: #3a3a45; }
+
+.hint { font-size: 12.5px; color: #6b6b73; line-height: 1.6; }
+.hint code, .priorityNote code, .footNote code, .securityWarn code, .refLine code {
+  color: #a855f7; background: #a855f714; padding: 1px 6px; border-radius: 5px; font-size: 12px;
+  /* Nomes longos (caminho da migration, nomes de env) precisam quebrar, senão
+     empurram a página e criam scroll horizontal no celular. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.hint strong { color: #9b9ba3; }
+.warnInline { color: #f59e0b !important; }
+
+.priorityNote {
+  background: #0f0f14;
+  border: 1px dashed #2a2a35;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 12.5px;
+  color: #9b9ba3;
+  line-height: 1.7;
+}
+.priorityNote strong { color: #d4d4d8; }
+/* `list-style: decimal` explícito: o preflight do Tailwind zera as marcações
+   de ol/ul, e sem isso a ordem de prioridade aparecia sem os números. */
+.priorityNote ol { margin: 8px 0 0; padding-left: 22px; list-style: decimal outside; }
+.priorityNote li { margin-bottom: 3px; padding-left: 2px; }
+.priorityNote li::marker { color: #a855f7; font-weight: 800; }
+.priorityNote em { color: #a855f7; font-style: normal; font-weight: 700; }
+
+.securityWarn {
+  display: flex; gap: 13px; align-items: flex-start;
+  background: rgba(245, 158, 11, 0.07);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 12px;
+  padding: 15px 17px;
+}
+.securityWarn strong { color: #fff; font-size: 13.5px; }
+.securityWarn p { margin: 6px 0 0; font-size: 12.5px; color: #c9c9d1; line-height: 1.65; }
+.securityWarn svg { flex-shrink: 0; margin-top: 1px; }
+
+/* ===== Mensagens ===== */
+.okMsg, .errMsg {
+  display: flex; align-items: center; gap: 9px;
+  padding: 13px 16px; border-radius: 10px;
+  font-size: 13px; font-weight: 600; line-height: 1.5;
+}
+.okMsg { background: #22c55e1a; border: 1px solid #22c55e55; color: #86efac; }
+.errMsg { background: #ef44441a; border: 1px solid #ef444455; color: #fca5a5; }
+.okMsg svg, .errMsg svg { flex-shrink: 0; }
+
+.primaryBtn {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 9px;
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: #fff; border: none;
+  padding: 14px 24px; border-radius: 10px;
+  font-size: 14px; font-weight: 800; font-family: inherit;
+  cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+}
+.primaryBtn:hover { opacity: 0.92; }
+.primaryBtn:active { transform: scale(0.98); }
+.primaryBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.footNote {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 12.5px; color: #6b6b73; line-height: 1.65;
+  padding-bottom: 20px;
+}
+.footNote svg { flex-shrink: 0; margin-top: 2px; }
+
+/* ===== Mobile ===== */
+@media (max-width: 860px) {
+  .container { padding: 20px 16px 40px; }
+  .titleArea h1 { font-size: 24px; }
+  .titleArea p { font-size: 13px; }
+  .card { padding: 18px 16px; gap: 16px; margin-bottom: 26px; }
+
+  /* 16px no input impede o iOS de dar zoom ao focar o campo */
+  .field input { font-size: 16px; padding: 13px 14px; }
+
+  .primaryBtn { align-self: stretch; justify-content: center; padding: 15px 20px; }
+  .ghostBtn { width: 100%; justify-content: center; }
+  .statusRow > div { min-width: 100%; }
+  .securityWarn { padding: 13px 14px; }
+}

@@ -2,7 +2,10 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover habilita env(safe-area-inset-*) — usado pela navbar
+         do /admin pra não ficar embaixo do notch/barra de gestos no celular -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d0d12" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
     <title>Brazilian Life RP</title>
@@ -11,8 +14,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
 
-    <link rel="preload" as="image" href="https://nfctydisrnpofyscngrx.supabase.co/storage/v1/object/public/videos-tutoriais/background.png">
-    <link rel="preload" as="image" href="https://nfctydisrnpofyscngrx.supabase.co/storage/v1/object/public/videos-tutoriais/thumb.png">
+    <!-- Fundo da tela de redirecionamento: servido localmente (public/background.png).
+         Antes vinha de um bucket do Supabase — como a LP agora só existe pra
+         redirecionar em ~4s, depender de um host externo pro fundo era risco de
+         a pessoa ver tela em branco e sair antes do redirect. -->
+    <link rel="preload" as="image" href="/background.png">
 
     <!-- Google Tag Manager (SantaGroup) -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':

@@ -135,9 +135,9 @@ export default function AdminDashboard() {
     : allData.filter(d => (d.influencer || '').toLowerCase() === selectedInfluencer);
 
   // Quando filtra por influenciador, mostra só os codiguins DELE (ex: mila -> MILA, spawnin -> BRASIL)
-  const selectedCodes = selectedInfluencer === 'all'
+  const selectedCodes: Set<string> | null = selectedInfluencer === 'all'
     ? null
-    : new Set(
+    : new Set<string>(
         influencers
           .filter(inf => inf.slug === selectedInfluencer && inf.roblox_code)
           .map(inf => (inf.roblox_code as string).toUpperCase())
@@ -458,10 +458,12 @@ export default function AdminDashboard() {
       (codeToInfluencers[c] = codeToInfluencers[c] || []).push(inf.name);
     }
   });
-  // Quando filtra por influenciador, só os códigos DELE entram no ranking de codiguins
-  const codeUniverse = selectedCodes
+  // Quando filtra por influenciador, só os códigos DELE entram no ranking de codiguins.
+  // Anotação explícita: sem ela o TS infere `unknown[]` do ternário entre os dois
+  // `Array.from` e reclama ao usar `code` como índice logo abaixo.
+  const codeUniverse: string[] = selectedCodes
     ? Array.from(selectedCodes)
-    : Array.from(new Set([...Object.keys(usageByCode), ...Object.keys(codeToInfluencers)]));
+    : Array.from(new Set<string>([...Object.keys(usageByCode), ...Object.keys(codeToInfluencers)]));
   const robloxBreakdown = codeUniverse
     .map(code => ({ code, count: usageByCode[code] || 0, influencers: codeToInfluencers[code] || [] }))
     .sort((a, b) => b.count - a.count);

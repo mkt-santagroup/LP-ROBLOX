@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Megaphone, DollarSign, MousePointerClick, Percent, Target,
   RefreshCw, AlertTriangle, Settings,
@@ -101,9 +102,10 @@ export default function AnunciosDashboard() {
           <div>
             <strong>Integração do Meta ainda não configurada.</strong>
             <p>
-              Faça o deploy da função <code>meta-ads</code> e defina os secrets{' '}
-              <code>META_TOKEN</code> e <code>META_AD_ACCOUNT</code>{' '}
-              (e opcionalmente <code>META_PREFIXO_CAMPANHA</code>) no Supabase.
+              Preencha o <strong>token</strong> e a <strong>conta de anúncios</strong> em{' '}
+              <Link to="/admin/configuracoes" className={styles.noticeLink}>Configurações</Link>{' '}
+              — vale na hora, sem deploy. (Também dá pra deixar em{' '}
+              <code>VITE_META_TOKEN</code> e <code>VITE_META_AD_ACCOUNT</code> no <code>.env</code>.)
             </p>
           </div>
         </div>

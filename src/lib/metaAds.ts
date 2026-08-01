@@ -1,13 +1,16 @@
 /// <reference types="vite/client" />
 //
 // ⚠️ AVISO DE SEGURANÇA — LEIA:
-// Este módulo chama a Graph API do Meta DIRETO do navegador, lendo o token de
-// `VITE_META_TOKEN`. Tudo que começa com VITE_ é embutido no bundle e fica PÚBLICO:
-// qualquer visitante do site (mesmo sem a senha do /admin) consegue extrair o token
-// e usar a sua conta de anúncios. Foi feito assim a pedido (sem backend).
+// Este módulo chama a Graph API do Meta DIRETO do navegador. O token vem do painel
+// (/admin/configuracoes, tabela `lp_config`) ou, como fallback, de `VITE_META_TOKEN`.
+// Nos dois casos ele chega ao navegador e fica PÚBLICO: qualquer visitante do site
+// (mesmo sem a senha do /admin) consegue extrair o token e usar a sua conta de
+// anúncios. Foi feito assim a pedido (sem backend).
 // Pra esconder o token, o caminho é mover esta lógica pra um servidor/Edge Function.
 //
 // Espelha a lógica do projeto IA-DIRECT-GRANDE (dashboard/lib/metaAds.ts).
+
+import { getMetaCredentials } from './appConfig';
 
 // Versões da Graph API (mesma escolha do projeto de referência: lista numa, insights noutra).
 const V_CAMPANHAS = 'v25.0';
@@ -149,12 +152,12 @@ const reISO = /^\d{4}-\d{2}-\d{2}$/;
 // Puxa os insights por campanha, direto da Graph API. Nunca lança: devolve um objeto
 // de erro amigável pra não quebrar a tela.
 export async function fetchMetaAds(query: MetaAdsQuery): Promise<MetaAdsResponse> {
-  const token = import.meta.env.VITE_META_TOKEN ?? '';
-  const adAccount = import.meta.env.VITE_META_AD_ACCOUNT ?? '';
-  // prefixo do query tem prioridade (ex: prefixo do influencer); senão usa o do env.
-  const prefixo = query.prefixo !== undefined
-    ? query.prefixo
-    : (import.meta.env.VITE_META_PREFIXO_CAMPANHA ?? '');
+  // Credenciais salvas no painel têm prioridade; sem elas, cai no .env.
+  const creds = await getMetaCredentials();
+  const token = creds.token;
+  const adAccount = creds.adAccount;
+  // prefixo do query tem prioridade (ex: prefixo do influencer); senão usa o configurado.
+  const prefixo = query.prefixo !== undefined ? query.prefixo : creds.prefixo;
 
   const custom = !!(query.since && query.until && reISO.test(query.since) && reISO.test(query.until));
   let dias: number, since: string, until: string;
@@ -249,11 +252,10 @@ export interface MetaSpendPorDia {
 export async function fetchMetaSpendPorDia(
   query: { since: string; until: string; prefixo?: string },
 ): Promise<MetaSpendPorDia> {
-  const token = import.meta.env.VITE_META_TOKEN ?? '';
-  const adAccount = import.meta.env.VITE_META_AD_ACCOUNT ?? '';
-  const prefixo = query.prefixo !== undefined
-    ? query.prefixo
-    : (import.meta.env.VITE_META_PREFIXO_CAMPANHA ?? '');
+  const creds = await getMetaCredentials();
+  const token = creds.token;
+  const adAccount = creds.adAccount;
+  const prefixo = query.prefixo !== undefined ? query.prefixo : creds.prefixo;
 
   if (!token || !adAccount) return { configurado: false, erro: null, porDia: {}, total: 0 };
 
