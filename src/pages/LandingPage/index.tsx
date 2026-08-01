@@ -19,7 +19,12 @@ import styles from './Redirect.module.css';
 //     usando o link do .env / o padrão do código.
 //  2. O link vem, nessa ordem: influencer > config global do painel > .env > padrão.
 //  3. A conversão (entrou_no_jogo) é enviada ANTES de navegar, com um teto de
-//     espera curto pra não segurar a pessoa na tela.
+//     espera curto pra não segurar a pessoa na tela. A gravação em si vai com
+//     `keepalive`, então ela termina mesmo depois de a página sair do ar — o
+//     teto só cobre a espera pelo cadastro do visitante.
+//  4. A saída é registrada com o MODO ('auto' quando o timer estoura sozinho,
+//     'manual' quando a pessoa toca no link de escape antes disso). É o que
+//     separa, no painel, quem foi redirecionado de quem teve que clicar.
 //
 
 /** Teto de espera pelo envio da conversão antes de navegar pra fora. */
@@ -31,7 +36,7 @@ export const LandingPage = () => {
 
   // `null` no lugar do videoRef: esta página não tem vídeo, então o hook só
   // registra o acesso (pageview + visitante) e a conversão.
-  const { trackLinkClick } = useRobloxAnalytics(null, { influencer, social });
+  const { trackRedirect } = useRobloxAnalytics(null, { influencer, social });
 
   // Começa já com o fallback (.env / padrão) pra nunca existir um instante em
   // que a página não saiba pra onde ir.
@@ -80,7 +85,7 @@ export const LandingPage = () => {
   }, [influencer]);
 
   // ---- 2. Dispara o redirecionamento ----
-  const go = useCallback(async () => {
+  const go = useCallback(async (mode: 'auto' | 'manual') => {
     if (redirected.current) return;
     redirected.current = true;
 
@@ -90,7 +95,7 @@ export const LandingPage = () => {
     // demorar mais que o teto, navega assim mesmo.
     try {
       await Promise.race([
-        Promise.resolve(trackLinkClick()),
+        Promise.resolve(trackRedirect(mode)),
         new Promise((r) => setTimeout(r, TRACKING_FLUSH_MS)),
       ]);
     } catch {
@@ -100,7 +105,7 @@ export const LandingPage = () => {
     // `replace` em vez de `href`: a tela de redirecionamento não fica no
     // histórico, então o "voltar" do navegador não joga a pessoa de volta nela.
     window.location.replace(url);
-  }, [trackLinkClick]);
+  }, [trackRedirect]);
 
   // ---- 3. Contagem + barra de progresso ----
   useEffect(() => {
@@ -112,14 +117,27 @@ export const LandingPage = () => {
       setProgress(pct);
 
       if (elapsed >= delayMs) {
-        go();
+        go('auto');
         return;
       }
       frame = requestAnimationFrame(tick);
     };
 
     frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+
+    // Rede de segurança do redirect: o navegador PAUSA o requestAnimationFrame
+    // em aba que não está na frente — quem abre o link em nova aba (ou num
+    // in-app browser que pré-carrega a página) ficaria preso na tela de espera
+    // pra sempre, e apareceria no painel como quem "saiu antes". O setTimeout
+    // é só afunilado em segundo plano, não congelado, então ele garante a saída.
+    // `go` é idempotente: quem chegar primeiro manda.
+    const restante = Math.max(0, delayMs - (Date.now() - startedAt.current));
+    const rede = setTimeout(() => go('auto'), restante + 250);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(rede);
+    };
   }, [delayMs, go]);
 
   const secondsLeft = Math.max(0, Math.ceil((delayMs - (progress / 100) * delayMs) / 1000));
@@ -143,8 +161,23 @@ export const LandingPage = () => {
         </div>
 
         {/* Rede de segurança: se o navegador bloquear o redirect automático
-            (alguns in-app browsers fazem isso), a pessoa ainda tem um toque. */}
-        <a href={targetUrl} className={styles.manualLink} onClick={() => { redirected.current = true; }}>
+            (alguns in-app browsers fazem isso), a pessoa ainda tem um toque.
+            O toque vira uma saída 'manual' no painel — é o número que mostra
+            quantas pessoas não esperaram (ou não puderam esperar) o automático. */}
+        <a
+          href={targetUrl}
+          className={styles.manualLink}
+          onClick={(e) => {
+            // O automático já disparou e mesmo assim a pessoa tocou: o navegador
+            // provavelmente segurou o redirect. Deixa o link seguir sozinho —
+            // interceptar aqui deixaria o toque sem efeito nenhum — e só registra.
+            if (redirected.current) { trackRedirect('manual'); return; }
+            // Ainda dentro da contagem: intercepta pra gravar a saída como
+            // manual antes de navegar.
+            e.preventDefault();
+            go('manual');
+          }}
+        >
           Não abriu? Toque aqui pra entrar
         </a>
       </main>

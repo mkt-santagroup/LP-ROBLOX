@@ -53,7 +53,12 @@ Pegue a URL e a chave em **Supabase → Project Settings → Data API**
 
 No **SQL Editor** do Supabase, rode os arquivos de `supabase/migrations/` em ordem.
 Todos são idempotentes (pode rodar de novo sem quebrar nada). A mais recente,
-`20260731_create_lp_config.sql`, cria a tabela usada pela tela de Configurações.
+`20260801_add_redirect_tracking_to_lp_roblox.sql`, cria as colunas que separam
+redirect automático de clique manual no painel.
+
+> Enquanto essa migration não roda, a LP continua funcionando e ainda registra a
+> conversão — ela só não consegue gravar **como** a pessoa saiu, e o painel mostra
+> tudo como "LP antiga". O console avisa quando isso acontece.
 
 ### 3. Resto no painel
 
@@ -77,6 +82,37 @@ Do mais específico pro mais genérico — vale o primeiro que existir:
 Essa cascata existe pra que a LP **sempre** tenha pra onde mandar a pessoa: se o
 Supabase estiver fora do ar ou demorar demais, ela cai pro `.env` e redireciona
 do mesmo jeito, sem travar na tela de espera.
+
+---
+
+## O que o painel mede
+
+A LP tem duas saídas possíveis pro jogo, e o painel separa as duas porque a
+diferença entre elas é diagnóstico:
+
+| Métrica | O que é |
+| --- | --- |
+| **Usuários únicos** | quantas pessoas chegaram na tela de espera (`visitor_id`) |
+| **Redirecionados** | quantas de fato foram mandadas pro jogo |
+| **Saíram antes** | chegaram e fecharam a página sem chegar no jogo |
+| **Redirect automático** | o timer estourou e a página foi sozinha — o fluxo esperado |
+| **Clicaram no link antes** | tocaram em *"Não abriu? Toque aqui"* **antes** do timer |
+
+**Clique manual subindo é sinal de problema:** ou o tempo de espera está longo
+demais (ajuste em `/admin/configuracoes`), ou o navegador in-app do Instagram/TikTok
+está segurando o redirect automático daquele público. Se o mesmo visitante toca
+mais de uma vez, `manual_clicks` acumula — é o sintoma mais forte de redirect travado.
+
+Todas essas métricas respeitam o filtro de influenciador e aparecem quebradas por
+pessoa (e por rede social) no ranking de origem.
+
+Duas coisas garantem que "redirecionados" não seja subestimado:
+
+- a gravação vai com `keepalive`, então ela **termina mesmo depois** de a página
+  sair do ar — antes, toda conexão mais lenta que o teto de espera perdia o registro;
+- o redirect tem um `setTimeout` de segurança além do `requestAnimationFrame`, que o
+  navegador **pausa** em aba de segundo plano. Sem ele, quem abria o link numa aba
+  de fundo nunca era redirecionado e entrava na conta como "saiu antes".
 
 ---
 

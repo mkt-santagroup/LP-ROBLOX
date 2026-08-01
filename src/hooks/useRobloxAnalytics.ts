@@ -1,5 +1,5 @@
 import { useEffect, useRef, RefObject } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, updateVisitorKeepalive } from '../lib/supabase';
 import { slugify, getInfluencerBySlug } from '../lib/influencers';
 
 // Declarar as variáveis globais do Meta e GTM pro TypeScript não reclamar
@@ -15,6 +15,12 @@ interface TrackingOrigin {
   social?: string;
 }
 
+/** Como a pessoa saiu da LP pro jogo. */
+export type RedirectMode = 'auto' | 'manual';
+
+/** Teto de espera pelo IP — é uma API externa, não pode segurar o cadastro. */
+const IP_LOOKUP_TIMEOUT_MS = 2000;
+
 export function useRobloxAnalytics(
   // `null` = página sem vídeo (a LP de redirecionamento). Todo o tracking de
   // progresso de vídeo simplesmente não roda, o resto (pageview, conversão)
@@ -28,10 +34,18 @@ export function useRobloxAnalytics(
   const highestMaxProgress = useRef<number>(0);
   // Garante que o "Play" (click_start + pixel) seja contado UMA vez, no play real
   const playStartedRef = useRef<boolean>(false);
-  
+
+  // Toques no link de escape ("Não abriu? Toque aqui pra entrar")
+  const manualClicks = useRef<number>(0);
+  // Garante que o MODO da saída (auto/manual) seja gravado uma vez só
+  const redirectTracked = useRef<boolean>(false);
+  // Resolve quando a linha do visitante já existe no banco. A saída pro jogo
+  // espera por isso — um UPDATE numa linha que ainda não nasceu não grava nada.
+  const visitorReady = useRef<Promise<void> | null>(null);
+
   // Controle para disparar o PageView apenas uma vez por carregamento
   const pageViewFired = useRef<boolean>(false);
-  
+
   // Usar um Set local para a sessão atual, assim o pixel dispara sempre que você testar (dar F5)
   const sessionMilestones = useRef<Set<number>>(new Set());
 
@@ -87,6 +101,21 @@ export function useRobloxAnalytics(
     if (!storedId) localStorage.setItem('roblox_analytics_visitor_id', currentVisitorId);
     visitorId.current = currentVisitorId;
 
+    // Busca o IP numa API externa. Bounded: se ela demorar/cair, o cadastro do
+    // visitante segue sem IP em vez de ficar preso esperando.
+    const fetchIp = async (): Promise<string | null> => {
+      try {
+        const response = await fetch('https://api.ipify.org?format=json', {
+          signal: AbortSignal.timeout(IP_LOOKUP_TIMEOUT_MS),
+        });
+        const data = await response.json();
+        return data.ip || null;
+      } catch (e) {
+        console.error("Erro ao obter IP:", e);
+        return null;
+      }
+    };
+
     const initVisitor = async () => {
       try {
       // --- LOG DE TRACKING (PAGEVIEW) ---
@@ -96,24 +125,23 @@ export function useRobloxAnalytics(
         pageViewFired.current = true;
       }
 
-      let userIp = "0.0.0.0";
-      try {
-        const response = await fetch('https://api.ipify.org?format=json');
-        const data = await response.json();
-        userIp = data.ip;
-      } catch (e) {
-        console.error("Erro ao obter IP:", e);
-      }
-
       const deviceType = getDeviceType();
 
       // VALIDAÇÃO: só conta como origem de influenciador se ele EXISTIR cadastrado.
       // /satorogojo (não cadastrado) -> acesso normal, sem criar nada.
+      //
+      // Vai junto com a leitura da linha existente: são duas idas ao mesmo banco,
+      // e na LP de redirect cada ida a menos é tempo a menos de risco de a pessoa
+      // ser mandada pro jogo antes de existir linha pra registrar isso.
+      const [infRow, existing] = await Promise.all([
+        rawInfluencerSlug ? getInfluencerBySlug(rawInfluencerSlug) : Promise.resolve(null),
+        supabase.from('lp_roblox').select('*').eq('visitor_id', currentVisitorId).maybeSingle(),
+      ]);
+
       let influencer: string | null = null;
       let social: string | null = null;
       if (rawInfluencerSlug) {
-        const inf = await getInfluencerBySlug(rawInfluencerSlug);
-        if (inf) {
+        if (infRow) {
           influencer = rawInfluencerSlug;
           social = rawSocial;
         } else {
@@ -121,13 +149,16 @@ export function useRobloxAnalytics(
         }
       }
 
-      const { data } = await supabase.from('lp_roblox').select('*').eq('visitor_id', currentVisitorId).maybeSingle();
+      const data = existing.data;
 
+      // O IP fica pra DEPOIS do cadastro de propósito: ele vem de uma API de
+      // terceiro e é o passo mais lento de todos. Gravar a linha primeiro é o
+      // que garante que uma saída pro jogo logo em seguida tenha onde ser
+      // registrada — o IP é complemento, o registro da pessoa não é.
       if (!data) {
         await supabase.from('lp_roblox').insert([{
           visitor_id: currentVisitorId,
           page_views: 1,
-          ip_address: userIp,
           device_type: deviceType,
           // Origem do tráfego (só preenchida se o influenciador existir)
           influencer: influencer,
@@ -140,10 +171,10 @@ export function useRobloxAnalytics(
         clickCalmaCount.current = data.click_calma || 0;
         highestExactProgress.current = data.exact_percentage_viewed || 0;
         highestMaxProgress.current = data.max_percentage_viewed || 0;
+        manualClicks.current = data.manual_clicks || 0;
 
         const updatePayload: any = {
           page_views: (data.page_views || 0) + 1,
-          ip_address: userIp,
           device_type: deviceType
         };
 
@@ -160,7 +191,15 @@ export function useRobloxAnalytics(
       }
     };
 
-    initVisitor();
+    // Quem for gravar a saída pro jogo espera por esta promise.
+    visitorReady.current = initVisitor();
+
+    // Complementa a linha com o IP quando (e se) ele chegar. Fora do
+    // `visitorReady` porque ninguém precisa esperar por isso.
+    visitorReady.current.then(async () => {
+      const ip = await fetchIp();
+      if (ip) await updateSession({ ip_address: ip });
+    });
   }, []);
 
   useEffect(() => {
@@ -182,10 +221,10 @@ export function useRobloxAnalytics(
       const checkPoints = [25, 50, 75, 95, 100];
       checkPoints.forEach((point) => {
         const threshold = point === 100 ? 99 : point;
-        
+
         if (progress >= threshold && !sessionMilestones.current.has(point)) {
           sessionMilestones.current.add(point);
-          
+
           // --- LOG DE TRACKING (PORCENTAGEM) ---
           console.log(`%c[TRACKING] dataLayer -> video_progress ${point}%`, "color: #f59e0b; font-weight: bold;");
 
@@ -218,14 +257,58 @@ export function useRobloxAnalytics(
       if (window.dataLayer) window.dataLayer.push({ event: 'clique_bloqueado' });
       updateSession({ click_calma: clickCalmaCount.current });
     },
-    trackLinkClick: () => {
-      // Conversão REAL — só dispara aqui (botão liberado, indo pro jogo). Nunca no "calma".
-      console.log(`%c[TRACKING] dataLayer -> entrou_no_jogo (CONVERSÃO)`, "color: #22c55e; font-weight: bold;");
-      if (window.dataLayer) window.dataLayer.push({ event: 'entrou_no_jogo' });
 
-      // Devolve a promise: a LP de redirect espera (com timeout) pra a gravação
-      // não ser cancelada pela navegação pra fora do site.
-      return updateSession({ click_link: true });
+    /**
+     * Saída pro jogo — a conversão da LP de redirecionamento.
+     *
+     * `mode` guarda COMO a pessoa saiu:
+     *   'auto'   -> o timer estourou e a página navegou sozinha;
+     *   'manual' -> ela tocou no link de escape ANTES do timer estourar.
+     *
+     * Muito 'manual' quer dizer que a espera está longa demais (ou que o
+     * navegador in-app está bloqueando o redirect) — é exatamente esse número
+     * que o painel separa do total.
+     */
+    trackRedirect: async (mode: RedirectMode): Promise<boolean> => {
+      if (mode === 'manual') manualClicks.current += 1;
+
+      // O modo da saída já foi gravado: um toque no link depois disso é a
+      // pessoa insistindo porque o automático não pegou. Não reescreve o modo —
+      // só engrossa o contador de toques, que é o sinal de redirect travado.
+      if (redirectTracked.current) {
+        return updateVisitorKeepalive(visitorId.current, { manual_clicks: manualClicks.current });
+      }
+      redirectTracked.current = true;
+
+      console.log(`%c[TRACKING] dataLayer -> redirect_${mode} + entrou_no_jogo (CONVERSÃO)`, "color: #22c55e; font-weight: bold;");
+      if (window.dataLayer) {
+        // Conversão — nome que o pixel/GTM já escutam. Não mexer.
+        window.dataLayer.push({ event: 'entrou_no_jogo' });
+        // Detalhe do modo, pra separar no GTM quem saiu sozinho de quem insistiu.
+        window.dataLayer.push({ event: `redirect_${mode}` });
+      }
+
+      // A linha do visitante nasce de forma assíncrona no primeiro acesso. Sem
+      // esperar por ela, um redirect rápido faria o UPDATE não achar linha
+      // nenhuma — e a saída sumiria da contagem justamente nos acessos mais
+      // rápidos. É por isso que "de fato foram redirecionadas" era subestimado.
+      if (visitorReady.current) await visitorReady.current;
+
+      const ok = await updateVisitorKeepalive(visitorId.current, {
+        click_link: true,
+        redirect_mode: mode,
+        redirected_at: new Date().toISOString(),
+        manual_clicks: manualClicks.current,
+      });
+      if (ok) return true;
+
+      // Deu ruim gravando o detalhe — o caso mais provável é a migration
+      // 20260801_add_redirect_tracking_to_lp_roblox.sql ainda não ter rodado,
+      // e aí o PostgREST recusa o UPDATE inteiro por causa das colunas novas.
+      // Tenta de novo só com `click_link`: perder o modo da saída é chato,
+      // perder a conversão inteira seria bem pior.
+      console.warn('[Analytics] Não consegui gravar o modo do redirect — rode a migration de redirect_mode. Registrando só a conversão.');
+      return updateVisitorKeepalive(visitorId.current, { click_link: true });
     }
   };
 }

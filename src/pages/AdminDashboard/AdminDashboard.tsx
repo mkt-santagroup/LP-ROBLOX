@@ -6,9 +6,9 @@ import { fetchMetaSpendPorDia } from '../../lib/metaAds';
 import styles from './AdminDashboard.module.css';
 import CustomDatePicker from './CustomDatePicker';
 import InfluencerPicker from './InfluencerPicker';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Bar, Line, Legend } from 'recharts';
+import { Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Bar, Line, Legend } from 'recharts';
 import {
-  Users, Eye, Clock, PlayCircle, AlertTriangle, MousePointerClick, BarChart2,
+  Users, Eye, PlayCircle, AlertTriangle, MousePointerClick, ExternalLink, Zap, Split,
   Target, Smartphone, Monitor, Tablet, Trophy, Filter, Users2, Link2, TrendingUp, Ticket,
   Info, DollarSign
 } from 'lucide-react';
@@ -86,7 +86,7 @@ function ConversionTooltip({ active, payload, label }: any) {
           <b style={{ paddingTop: 5, textAlign: 'right' }}>{row.acessos ?? 0}</b>
           <b style={{ paddingTop: 5, paddingLeft: 12, borderLeft: '1px solid #3a3a45', textAlign: 'right', color: '#c084fc' }}>{brl(row.custoAcesso ?? 0)}</b>
 
-          <span style={{ paddingTop: 5, color: '#22c55e' }}>Conversões (LP)</span>
+          <span style={{ paddingTop: 5, color: '#22c55e' }}>Redirecionados</span>
           <b style={{ paddingTop: 5, textAlign: 'right', color: '#22c55e' }}>{row.conversoes ?? 0}</b>
           <b style={{ paddingTop: 5, paddingLeft: 12, borderLeft: '1px solid #3a3a45', textAlign: 'right', color: '#00e5ff' }}>{brl(row.custoConversao ?? 0)}</b>
 
@@ -97,9 +97,16 @@ function ConversionTooltip({ active, payload, label }: any) {
       ) : (
         <>
           <div className={styles.convTooltipRow}><span>Acessos</span><b>{row.acessos ?? 0}</b></div>
-          <div className={styles.convTooltipRow} style={{ color: '#22c55e' }}><span>Conversões (LP)</span><b>{row.conversoes ?? 0}</b></div>
+          <div className={styles.convTooltipRow} style={{ color: '#22c55e' }}><span>Redirecionados</span><b>{row.conversoes ?? 0}</b></div>
           <div className={styles.convTooltipRow} style={{ color: '#f59e0b' }}><span>Resgates (Roblox)</span><b>{row.resgates ?? 0}</b></div>
         </>
+      )}
+      {(row.manual ?? 0) > 0 && (
+        <div className={styles.convTooltipCodes}>
+          <div className={styles.convTooltipRow} style={{ color: '#fbbf24' }}>
+            <span>↳ por clique manual</span><b>{row.manual}</b>
+          </div>
+        </div>
       )}
       {row.gastoAtivo && (
         <div className={styles.convTooltipCodes}>
@@ -300,46 +307,56 @@ export default function AdminDashboard() {
   const uniqueUsers = data.length;
   const totalViews = data.reduce((acc, curr) => acc + (curr.page_views || 1), 0);
 
-  const playsData = data.filter(d => d.click_start);
-  const plays = playsData.length;
+  // --- REDIRECIONAMENTO ---
+  // `click_link` = a pessoa foi mandada pro jogo. É a contagem TOTAL e vale
+  // também pros registros da LP antiga (com vídeo), onde a saída era o clique
+  // no CTA — por isso continua sendo a base de "redirecionados".
+  const redirecionados = data.filter(d => d.click_link).length;
+  // `redirect_mode` só existe a partir da LP de redirect: diz COMO a pessoa saiu.
+  const redirectAuto = data.filter(d => d.redirect_mode === 'auto').length;
+  const redirectManual = data.filter(d => d.redirect_mode === 'manual').length;
+  // Saíram pro jogo antes de o modo passar a ser registrado (LP com vídeo).
+  const redirectHistorico = Math.max(redirecionados - redirectAuto - redirectManual, 0);
+  // TOQUES no link de escape. Pode ser mais de um por pessoa: quando o navegador
+  // in-app segura o redirect automático, ela toca de novo.
+  const toquesManuais = data.reduce((acc, d) => acc + Number(d.manual_clicks || 0), 0);
+  // Chegaram na tela de espera e foram embora sem chegar no jogo.
+  const saiuAntes = Math.max(uniqueUsers - redirecionados, 0);
 
-  const avgTime = plays > 0
-    ? (playsData.reduce((acc, curr) => acc + Number(curr.exact_percentage_viewed || 0), 0) / plays).toFixed(1)
-    : "0.0";
-
-  const iniciaramVideo = plays;
-  const iniciaramVideoRate = uniqueUsers > 0 ? ((iniciaramVideo / uniqueUsers) * 100).toFixed(1) : "0.0";
-
-  // SOMA TOTAL DE CLIQUES NA ESPERA
-  const totalCliquesEspera = data.reduce((acc, curr) => acc + Number(curr.click_calma || 0), 0);
-  const usersClicaramEspera = data.filter(d => Number(d.click_calma || 0) > 0).length;
-  const esperaRate = iniciaramVideo > 0 ? ((usersClicaramEspera / iniciaramVideo) * 100).toFixed(1) : "0.0";
-
-  const foramProLink = data.filter(d => d.click_link).length;
-  const linkRate = iniciaramVideo > 0 ? ((foramProLink / iniciaramVideo) * 100).toFixed(1) : "0.0";
+  const redirectRate = uniqueUsers > 0 ? ((redirecionados / uniqueUsers) * 100).toFixed(1) : "0.0";
+  const saiuAntesRate = uniqueUsers > 0 ? ((saiuAntes / uniqueUsers) * 100).toFixed(1) : "0.0";
+  // Auto e manual são medidos entre as saídas que TÊM modo registrado — jogar o
+  // histórico no denominador achataria os dois percentuais sem motivo.
+  const comModo = redirectAuto + redirectManual;
+  const autoRate = comModo > 0 ? ((redirectAuto / comModo) * 100).toFixed(1) : "0.0";
+  const manualRate = comModo > 0 ? ((redirectManual / comModo) * 100).toFixed(1) : "0.0";
 
   // MÉTRICA-HERÓI: conversão geral (acesso -> entrou no jogo)
-  const conversaoGeral = uniqueUsers > 0 ? ((foramProLink / uniqueUsers) * 100).toFixed(1) : "0.0";
+  const conversaoGeral = redirectRate;
 
-  // Gráfico de Retenção
-  const chartData = Array.from({ length: 101 }, (_, index) => ({
-    percentage: index,
-    users: playsData.filter(row => Number(row.exact_percentage_viewed || 0) >= index).length
-  }));
-
-  // --- FUNIL DE RETENÇÃO DO VÍDEO (quanto cada pessoa assistiu) ---
-  const countAtLeast = (pct: number) => data.filter(d => Number(d.max_percentage_viewed || 0) >= pct).length;
+  // --- FUNIL DE REDIRECIONAMENTO ---
   const funnelStages = [
-    { label: 'Deram Play', value: plays, color: '#3b82f6', icon: PlayCircle },
-    { label: 'Viram 25%', value: countAtLeast(25), color: '#06b6d4', icon: Eye },
-    { label: 'Viram 50%', value: countAtLeast(50), color: '#10b981', icon: Eye },
-    { label: 'Viram 75%', value: countAtLeast(75), color: '#22c55e', icon: Eye },
-    { label: 'Viram 95%', value: countAtLeast(95), color: '#84cc16', icon: Eye },
-    { label: 'Assistiram 100%', value: countAtLeast(100), color: '#f59e0b', icon: Trophy },
-    { label: 'Clicaram no Link', value: foramProLink, color: '#ec4899', icon: MousePointerClick },
-    { label: 'Resgataram Codiguin', value: usagesView.length, color: '#a855f7', icon: Ticket },
+    { label: 'Acessaram a LP', value: uniqueUsers, color: '#a855f7', icon: Users },
+    { label: 'Foram pro jogo', value: redirecionados, color: '#22c55e', icon: ExternalLink },
+    { label: 'Resgataram Codiguin', value: usagesView.length, color: '#f59e0b', icon: Ticket },
   ];
   const funnelTop = funnelStages[0].value || 1;
+
+  // --- MODO DE SAÍDA: como a pessoa foi parar no jogo ---
+  const exitModes = [
+    {
+      key: 'auto', label: 'Automático', color: '#22c55e', icon: Zap,
+      value: redirectAuto, hint: 'O timer estourou e a página foi pro jogo sozinha.',
+    },
+    {
+      key: 'manual', label: 'Clique manual', color: '#f59e0b', icon: MousePointerClick,
+      value: redirectManual, hint: 'Tocaram em "Não abriu? Toque aqui" antes do redirect automático.',
+    },
+    {
+      key: 'historico', label: 'LP antiga', color: '#6b7280', icon: PlayCircle,
+      value: redirectHistorico, hint: 'Saídas registradas antes deste rastreio existir (LP com vídeo).',
+    },
+  ].filter(m => m.value > 0);
 
   // --- DISPOSITIVOS ---
   const deviceCounts = data.reduce((acc: Record<string, number>, row) => {
@@ -354,8 +371,8 @@ export default function AdminDashboard() {
 
   // --- TIMELINE DIÁRIA: acessos + conversões (LP) + resgates de codiguin (Roblox) ---
   // Bucketiza no fuso de São Paulo (mesmo do date_start do Meta) pra casar com o gasto do dia.
-  const dayMap: Record<string, { acessos: number; conversoes: number; codes: Record<string, number> }> = {};
-  const ensureDay = (k: string) => (dayMap[k] = dayMap[k] || { acessos: 0, conversoes: 0, codes: {} });
+  const dayMap: Record<string, { acessos: number; conversoes: number; manual: number; codes: Record<string, number> }> = {};
+  const ensureDay = (k: string) => (dayMap[k] = dayMap[k] || { acessos: 0, conversoes: 0, manual: 0, codes: {} });
 
   data.forEach(row => {
     if (!row.created_at) return;
@@ -363,6 +380,9 @@ export default function AdminDashboard() {
     const b = ensureDay(k);
     b.acessos += 1;
     if (row.click_link) b.conversoes += 1;
+    // Sai junto no balão: um dia com muito clique manual é um dia em que a
+    // espera incomodou (ou em que o redirect automático travou).
+    if (row.redirect_mode === 'manual') b.manual += 1;
   });
   usagesView.forEach(u => {
     if (!u.used_at) return;
@@ -376,7 +396,7 @@ export default function AdminDashboard() {
     const [, m, d] = k.split('-');
     const b = dayMap[k];
     const resgates = Object.values(b.codes).reduce((s, n) => s + n, 0);
-    return { key: k, label: `${d}/${m}`, acessos: b.acessos, conversoes: b.conversoes, resgates, codes: b.codes };
+    return { key: k, label: `${d}/${m}`, acessos: b.acessos, conversoes: b.conversoes, manual: b.manual, resgates, codes: b.codes };
   });
 
   // Cruza o GASTO (Meta) de cada dia com a timeline e calcula os custos do dia — vão pro balão.
@@ -400,19 +420,24 @@ export default function AdminDashboard() {
     if (!inf) return acc; // ignora acessos diretos (sem origem)
     const key = inf.toLowerCase();
     if (!acc[key]) {
-      acc[key] = { influencer: inf, users: 0, plays: 0, links: 0, socials: {} as Record<string, any> };
+      acc[key] = { influencer: inf, users: 0, redirects: 0, auto: 0, manual: 0, socials: {} as Record<string, any> };
     }
-    const g = acc[key];
-    g.users += 1;
-    if (row.click_start) g.plays += 1;
-    if (row.click_link) g.links += 1;
+    // `redirects` é o total que saiu pro jogo; `auto`/`manual` quebram esse
+    // total por COMO a pessoa saiu (a soma pode dar menos que `redirects`
+    // quando há registros da LP antiga, que não gravavam o modo).
+    const bump = (g: any) => {
+      g.users += 1;
+      if (row.click_link) g.redirects += 1;
+      if (row.redirect_mode === 'auto') g.auto += 1;
+      if (row.redirect_mode === 'manual') g.manual += 1;
+    };
+    bump(acc[key]);
 
     // Rede social (vazio = "direto", quando entrou só com /influenciador sem rede)
+    const g = acc[key];
     const social = (row.social_network || '').trim().toLowerCase() || 'direto';
-    if (!g.socials[social]) g.socials[social] = { users: 0, plays: 0, links: 0 };
-    g.socials[social].users += 1;
-    if (row.click_start) g.socials[social].plays += 1;
-    if (row.click_link) g.socials[social].links += 1;
+    if (!g.socials[social]) g.socials[social] = { users: 0, redirects: 0, auto: 0, manual: 0 };
+    bump(g.socials[social]);
     return acc;
   }, {});
 
@@ -432,8 +457,9 @@ export default function AdminDashboard() {
     influencer: 'Link direto',
     isDirect: true,
     users: directRows.length,
-    plays: directRows.filter(d => d.click_start).length,
-    links: directRows.filter(d => d.click_link).length,
+    redirects: directRows.filter(d => d.click_link).length,
+    auto: directRows.filter(d => d.redirect_mode === 'auto').length,
+    manual: directRows.filter(d => d.redirect_mode === 'manual').length,
     socialList: [] as any[],
   } : null;
 
@@ -541,39 +567,43 @@ export default function AdminDashboard() {
           color="#3b82f6"
         />
         <KpiCard
-          title="INICIARAM O VÍDEO"
-          value={iniciaramVideo.toLocaleString('pt-BR')}
-          subtitle={`${iniciaramVideoRate}% dos acessos únicos`}
-          icon={PlayCircle}
+          title="REDIRECIONADOS"
+          value={redirecionados.toLocaleString('pt-BR')}
+          subtitle={`${redirectRate}% dos acessos únicos foram pro jogo`}
+          icon={ExternalLink}
           color="#22c55e"
+          highlight
         />
         <KpiCard
-          title="CLIQUES NA ESPERA"
-          value={totalCliquesEspera.toLocaleString('pt-BR')}
-          subtitle={`${esperaRate}% de quem deu play se frustrou`}
+          title="SAÍRAM ANTES"
+          value={saiuAntes.toLocaleString('pt-BR')}
+          subtitle={`${saiuAntesRate}% fecharam a página sem chegar no jogo`}
           icon={AlertTriangle}
           color="#ef4444"
         />
       </div>
 
-      {/* FILEIRA 1.5: Stats secundários (Foram pro Link, Tempo médio, Conversão geral) */}
+      {/* FILEIRA 1.5: Como a pessoa saiu (automático x manual) + conversão geral */}
       <div className={styles.secondaryStrip}>
+        <div className={styles.miniStat}>
+          <div className={styles.miniStatIcon} style={{ backgroundColor: '#22c55e19' }}>
+            <Zap size={22} color="#22c55e" />
+          </div>
+          <div>
+            <div className={styles.miniStatValue}>{redirectAuto.toLocaleString('pt-BR')}</div>
+            <div className={styles.miniStatLabel}>Redirect automático ({autoRate}% das saídas rastreadas)</div>
+          </div>
+        </div>
         <div className={styles.miniStat}>
           <div className={styles.miniStatIcon} style={{ backgroundColor: '#f59e0b19' }}>
             <MousePointerClick size={22} color="#f59e0b" />
           </div>
           <div>
-            <div className={styles.miniStatValue}>{foramProLink.toLocaleString('pt-BR')}</div>
-            <div className={styles.miniStatLabel}>Foram pro link ({linkRate}% de quem deu play)</div>
-          </div>
-        </div>
-        <div className={styles.miniStat}>
-          <div className={styles.miniStatIcon} style={{ backgroundColor: '#10b98119' }}>
-            <Clock size={22} color="#10b981" />
-          </div>
-          <div>
-            <div className={styles.miniStatValue}>{avgTime}%</div>
-            <div className={styles.miniStatLabel}>Tempo médio assistido (quem deu play)</div>
+            <div className={styles.miniStatValue}>{redirectManual.toLocaleString('pt-BR')}</div>
+            <div className={styles.miniStatLabel}>
+              Clicaram no link antes ({manualRate}% das saídas
+              {toquesManuais > redirectManual ? ` · ${toquesManuais.toLocaleString('pt-BR')} toques no total` : ''})
+            </div>
           </div>
         </div>
         <div className={`${styles.miniStat} ${styles.miniStatHighlight}`}>
@@ -587,16 +617,16 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* FILEIRA 2: Funil de Retenção (verde) + Curva de Retenção (vermelha) lado a lado */}
-      <h2 className={styles.sectionHeader}>RETENÇÃO DO VÍDEO</h2>
+      {/* FILEIRA 2: Funil do redirect + como cada pessoa saiu, lado a lado */}
+      <h2 className={styles.sectionHeader}>REDIRECIONAMENTO</h2>
       <div className={styles.funnelChartGrid}>
-        {/* FUNIL (verde) */}
+        {/* FUNIL: acesso -> jogo -> codiguin */}
         <div className={styles.panel}>
           <div className={styles.cardTitle}>
             <Filter size={20} color="#22c55e" />
-            Funil de Retenção do Vídeo
+            Funil de Redirecionamento
           </div>
-          <p className={styles.panelSub}>Quanto do vídeo cada pessoa que deu play assistiu</p>
+          <p className={styles.panelSub}>Quantos acessos chegaram de fato ao jogo (e ao codiguin)</p>
           <div className={styles.funnel}>
             {funnelStages.map((stage, i) => {
               const widthPct = Math.max((stage.value / funnelTop) * 100, 4);
@@ -621,7 +651,7 @@ export default function AdminDashboard() {
                     >
                       <span className={styles.funnelValue}>{stage.value.toLocaleString('pt-BR')}</span>
                     </div>
-                    <span className={styles.funnelPct}>{ofTotal.toFixed(0)}% dos plays</span>
+                    <span className={styles.funnelPct}>{ofTotal.toFixed(0)}% dos acessos</span>
                   </div>
                 </div>
               );
@@ -629,42 +659,72 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* CURVA DE RETENÇÃO (vermelha) */}
-        <div className={styles.chartCard}>
-          <div className={styles.cardHeader}>
-            <div className={styles.cardTitle}>
-              <BarChart2 size={20} color="#ef4444" />
-              Curva de Retenção
-            </div>
+        {/* COMO SAIU: automático x clique manual */}
+        <div className={styles.panel}>
+          <div className={styles.cardTitle}>
+            <Split size={20} color="#f59e0b" />
+            Como a pessoa saiu pro jogo
           </div>
-          <p className={styles.panelSub} style={{ marginTop: '-12px', marginBottom: '8px' }}>
-            Quantos espectadores ainda estavam assistindo em cada ponto do vídeo
+          <p className={styles.panelSub}>
+            Muito clique manual = a espera está longa demais (ou o navegador está segurando o redirect)
           </p>
-          <div className={styles.chartWrapper} style={{ position: 'relative' }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2a2a35" />
-                  <XAxis dataKey="percentage" stroke="#8b8b93" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}%`} minTickGap={30} />
-                  <YAxis stroke="#8b8b93" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#16161b', borderColor: '#2a2a35', color: '#fff', borderRadius: '8px' }}
-                    itemStyle={{ color: '#f87171', fontWeight: 'bold' }}
-                    labelStyle={{ color: '#8b8b93', marginBottom: '4px' }}
-                    formatter={(value: any) => [`${value} espectadores`, 'Audiência']}
-                    labelFormatter={(label) => `Chegaram em ${label}% do vídeo`}
-                  />
-                  <Area type="monotone" dataKey="users" stroke="#ef4444" strokeWidth={3} fillOpacity={1} fill="url(#colorUsers)" activeDot={{ r: 6, fill: "#fff", stroke: "#ef4444", strokeWidth: 2 }} />
-                </AreaChart>
-              </ResponsiveContainer>
+          {redirecionados === 0 ? (
+            <div className={styles.emptyMini}>Ninguém foi redirecionado no período.</div>
+          ) : (
+            <div className={styles.deviceRow}>
+              <div className={styles.donutWrap}>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={exitModes}
+                      dataKey="value"
+                      nameKey="label"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={58}
+                      outerRadius={90}
+                      // Com uma fatia só o `paddingAngle` come o arco inteiro e
+                      // a rosca some — o respiro entre fatias só faz sentido
+                      // quando existe mais de uma.
+                      paddingAngle={exitModes.length > 1 ? 3 : 0}
+                      stroke="none"
+                    >
+                      {exitModes.map((m, i) => <Cell key={i} fill={m.color} />)}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#16161b', borderColor: '#2a2a35', color: '#fff', borderRadius: '8px' }}
+                      formatter={(value: any, name: any) => [`${value} pessoas`, name]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className={styles.donutCenter}>
+                  <div className={styles.donutCenterValue}>{redirecionados.toLocaleString('pt-BR')}</div>
+                  <div className={styles.donutCenterLabel}>no jogo</div>
+                </div>
+              </div>
+              <div className={styles.deviceBars}>
+                {exitModes.map((m, i) => {
+                  const pct = redirecionados > 0 ? Math.round((m.value / redirecionados) * 100) : 0;
+                  const MIcon = m.icon;
+                  return (
+                    <div key={i} className={styles.deviceBarRow} title={m.hint}>
+                      <div className={styles.deviceBarIcon} style={{ backgroundColor: `${m.color}1A` }}>
+                        <MIcon size={18} color={m.color} />
+                      </div>
+                      <div className={styles.deviceBarLabel}>
+                        <span className={styles.deviceBarName}>{m.label}</span>
+                        <span className={styles.deviceBarCount}>{m.value.toLocaleString('pt-BR')} pessoas</span>
+                      </div>
+                      <div className={styles.deviceBarTrack}>
+                        <div className={styles.deviceBarFill} style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${m.color}aa, ${m.color})` }} />
+                      </div>
+                      <span className={styles.deviceBarPct} style={{ color: m.color }}>{pct}%</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -673,7 +733,7 @@ export default function AdminDashboard() {
       <div className={styles.panel}>
         <div className={styles.cardTitle}>
           <TrendingUp size={20} color="#22c55e" />
-          Conversões ao longo do tempo
+          Redirecionamentos ao longo do tempo
         </div>
         <p className={styles.panelSub}>Quantas pessoas foram pro jogo a cada dia (vs. quantas acessaram)</p>
 
@@ -718,7 +778,7 @@ export default function AdminDashboard() {
                 <Tooltip content={<ConversionTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                 <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
                 <Bar dataKey="acessos" name="Acessos" fill="url(#gradAcessos)" radius={[6, 6, 0, 0]} maxBarSize={46} />
-                <Area type="monotone" dataKey="conversoes" name="Conversões" stroke="#22c55e" strokeWidth={3} fill="url(#gradConv)" dot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }} activeDot={{ r: 6, fill: '#fff', stroke: '#22c55e', strokeWidth: 2 }} />
+                <Area type="monotone" dataKey="conversoes" name="Redirecionados" stroke="#22c55e" strokeWidth={3} fill="url(#gradConv)" dot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }} activeDot={{ r: 6, fill: '#fff', stroke: '#22c55e', strokeWidth: 2 }} />
                 <Line type="monotone" dataKey="resgates" name="Resgates (Roblox)" stroke="#f59e0b" strokeWidth={3} dot={{ r: 3, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6, fill: '#fff', stroke: '#f59e0b', strokeWidth: 2 }} />
               </ComposedChart>
             </ResponsiveContainer>
@@ -744,7 +804,9 @@ export default function AdminDashboard() {
                     cy="50%"
                     innerRadius={58}
                     outerRadius={90}
-                    paddingAngle={3}
+                    // Idem ao donut de modo de saída: uma fatia só + paddingAngle
+                    // faz a rosca sumir.
+                    paddingAngle={deviceData.length > 1 ? 3 : 0}
                     stroke="none"
                   >
                     {deviceData.map((d, i) => <Cell key={i} fill={d.color} />)}
@@ -802,7 +864,7 @@ export default function AdminDashboard() {
         ) : (
           <div className={styles.ranking}>
             {originGroups.map((g: any, i: number) => {
-              const conv = g.users > 0 ? ((g.links / g.users) * 100).toFixed(1) : "0.0";
+              const conv = g.users > 0 ? ((g.redirects / g.users) * 100).toFixed(1) : "0.0";
               const barWidth = Math.max((g.users / topOriginUsers) * 100, 6);
               const isTop = i === 0;
               return (
@@ -814,8 +876,9 @@ export default function AdminDashboard() {
                     <div className={styles.rankIdentity}>
                       <span className={styles.rankName}>{g.influencer}</span>
                       <div className={styles.rankMeta}>
-                        <span><PlayCircle size={13} /> {g.plays} plays</span>
-                        <span><MousePointerClick size={13} /> {g.links} no link</span>
+                        <span><ExternalLink size={13} /> {g.redirects} no jogo</span>
+                        <span><Zap size={13} /> {g.auto} automático</span>
+                        <span><MousePointerClick size={13} /> {g.manual} manual</span>
                       </div>
                     </div>
                     <div className={styles.rankKpi}>
@@ -837,7 +900,7 @@ export default function AdminDashboard() {
                   <div className={styles.socialBlock}>
                     <div className={styles.socialBlockTitle}>POR REDE SOCIAL</div>
                     {g.socialList.map((s: any, si: number) => {
-                      const sConv = s.users > 0 ? Math.round((s.links / s.users) * 100) : 0;
+                      const sConv = s.users > 0 ? Math.round((s.redirects / s.users) * 100) : 0;
                       const sWidth = Math.max((s.users / g.users) * 100, 4);
                       const sColor = SOCIAL_COLOR[s.name] || '#a855f7';
                       return (
@@ -850,7 +913,7 @@ export default function AdminDashboard() {
                             <div className={styles.socialRowBar} style={{ width: `${sWidth}%`, background: `linear-gradient(90deg, ${sColor}99, ${sColor})` }} />
                           </div>
                           <span className={styles.socialRowUsers}>{s.users} usuários</span>
-                          <span className={styles.socialRowExtra}>{s.plays} plays · {s.links} link · {sConv}%</span>
+                          <span className={styles.socialRowExtra}>{s.redirects} no jogo · {s.manual} manual · {sConv}%</span>
                         </div>
                       );
                     })}
@@ -870,8 +933,9 @@ export default function AdminDashboard() {
                     <span className={styles.rankName}>Link direto</span>
                     <div className={styles.rankMeta}>
                       <span>Entraram direto, sem influenciador</span>
-                      <span><PlayCircle size={13} /> {directGroup.plays} plays</span>
-                      <span><MousePointerClick size={13} /> {directGroup.links} no link</span>
+                      <span><ExternalLink size={13} /> {directGroup.redirects} no jogo</span>
+                      <span><Zap size={13} /> {directGroup.auto} automático</span>
+                      <span><MousePointerClick size={13} /> {directGroup.manual} manual</span>
                     </div>
                   </div>
                   <div className={styles.rankKpi}>
@@ -881,7 +945,7 @@ export default function AdminDashboard() {
                   <div className={styles.rankKpiDivider} />
                   <div className={styles.rankKpi}>
                     <div className={styles.rankKpiVal} style={{ color: '#22c55e' }}>
-                      {directGroup.users > 0 ? ((directGroup.links / directGroup.users) * 100).toFixed(1) : "0.0"}%
+                      {directGroup.users > 0 ? ((directGroup.redirects / directGroup.users) * 100).toFixed(1) : "0.0"}%
                     </div>
                     <div className={styles.rankKpiLabel}>conversão</div>
                   </div>

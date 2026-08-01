@@ -71,6 +71,48 @@ const clientKey = supabaseAnonKey || 'placeholder-anon-key';
 
 export const supabase = createClient(clientUrl, clientKey);
 
+/**
+ * UPDATE em `lp_roblox` que SOBREVIVE à navegação pra fora do site.
+ *
+ * O supabase-js usa um fetch comum, e o navegador CANCELA qualquer fetch
+ * pendente assim que a página começa a sair (`window.location.replace`). Na LP
+ * de redirecionamento isso fazia perder justamente o registro mais importante —
+ * o de quem foi mandado pro jogo — em toda conexão mais lenta que o teto de
+ * espera. Com `keepalive: true` o navegador se compromete a terminar a
+ * requisição mesmo depois de a página morrer, então a gravação não depende mais
+ * de segurar a pessoa na tela.
+ *
+ * Fala direto com o PostgREST porque o `keepalive` não é exposto pelo
+ * supabase-js. Nunca lança: tracking não pode impedir ninguém de chegar no jogo.
+ */
+export async function updateVisitorKeepalive(
+  visitorId: string,
+  payload: Record<string, unknown>,
+): Promise<boolean> {
+  if (!supabaseConfig.ok || !visitorId) return false;
+  try {
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/lp_roblox?visitor_id=eq.${encodeURIComponent(visitorId)}`,
+      {
+        method: 'PATCH',
+        headers: {
+          apikey: clientKey,
+          Authorization: `Bearer ${clientKey}`,
+          'Content-Type': 'application/json',
+          // Sem corpo de resposta: menos bytes trafegando bem na hora em que a
+          // página está sendo destruída.
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      },
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export type SupabaseHealth = {
   ok: boolean;
   /** Categoria do problema — usada pra escolher a instrução mostrada no admin. */
