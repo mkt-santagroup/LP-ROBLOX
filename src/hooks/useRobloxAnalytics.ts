@@ -45,7 +45,7 @@ export const TRACKING_FLUSH_MS = Math.max(600, PIXEL_FLUSH_MS + 200);
  *
  * São dois disparos pro Meta, e só dois (ver `lib/metaPixel.ts`):
  *   PageView -> quando a pessoa abre a página;
- *   Lead     -> quando ela é mandada pro jogo.
+ *   Reencaminhado -> quando ela é mandada pro jogo.
  *
  * Os `dataLayer.push` que sobraram existem só pro GTM (lado Google). O pixel do
  * Meta NÃO depende mais deles.
@@ -88,6 +88,26 @@ export function useRobloxAnalytics(origin?: TrackingOrigin) {
   // Rede social padronizada em minúsculo (instagram, tiktok, youtube...)
   const rawSocial = cleanSlug(origin?.social)?.toLowerCase() ?? null;
 
+  /**
+   * Contexto que acompanha os DOIS eventos do pixel.
+   *
+   * Isto não é Advanced Matching (esse é montado em `metaPixel.ts` e só aceita
+   * a lista fechada do Meta) — são parâmetros personalizados, que aparecem no
+   * Events Manager e servem pra montar Conversões personalizadas e públicos
+   * ("quem veio do TikTok do fulano", "quem teve que clicar no link manual").
+   *
+   * Os `utm_*` e os ids de campanha/conjunto/anúncio vêm da URL do anúncio e
+   * são o que permite, depois, dizer qual ANÚNCIO específico trouxe quem
+   * converteu.
+   */
+  const eventParams = (extra?: Record<string, unknown>) => ({
+    ...(getCampaignParams() ?? {}),
+    influencer: rawInfluencerSlug,
+    rede_social: rawSocial,
+    device: getDeviceType(),
+    ...extra,
+  });
+
   // Devolve a promise pra quem precisar esperar a gravação terminar antes de
   // navegar pra fora (a LP de redirect faz isso, com timeout). Nunca lança:
   // se o banco estiver fora do ar, o tracking falha em silêncio e a página segue.
@@ -124,7 +144,16 @@ export function useRobloxAnalytics(origin?: TrackingOrigin) {
     // `_fbp`, e a conversão (~4s depois) só manda esse identificador se ele já
     // tiver nascido. Nada nesta linha depende do Supabase — se o banco estiver
     // fora do ar, o pixel dispara do mesmo jeito.
-    initMetaPixel(currentVisitorId);
+    //
+    // Os parâmetros usam o slug CRU da URL, sem esperar a validação no banco:
+    // o pixel não pode ficar atrás de uma ida ao Supabase. Se o influenciador
+    // não existir cadastrado, o painel trata como acesso normal — o parâmetro
+    // no evento continua sendo a informação verdadeira de por onde a pessoa veio.
+    initMetaPixel({
+      externalId: currentVisitorId,
+      eventId: crypto.randomUUID(),
+      params: eventParams(),
+    });
 
     // Busca o IP numa API externa. Bounded: se ela demorar/cair, o cadastro do
     // visitante segue sem IP em vez de ficar preso esperando.
@@ -306,7 +335,16 @@ export function useRobloxAnalytics(origin?: TrackingOrigin) {
       // ===== DISPARO 2 DE 2: a conversão =====
       // Começa AGORA, antes das esperas do banco, pra ter o máximo de tempo de
       // beacon antes de a página navegar pra fora.
-      const pixelFlushed = trackMetaConversion(eventId);
+      const pixelFlushed = trackMetaConversion({
+        eventId,
+        params: eventParams({
+          // Como a pessoa saiu: sozinha no timer ou tocando no link de escape.
+          redirect_mode: mode,
+          // Quanto tempo ela ficou na tela de espera. Serve pra separar, no
+          // Events Manager, quem esperou de quem saiu correndo.
+          tempo_na_pagina_ms: Math.round(performance.now()),
+        }),
+      });
 
       // Só pro GTM (lado Google) — o pixel do Meta já foi na linha de cima.
       if (window.dataLayer) {

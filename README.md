@@ -128,9 +128,14 @@ dois**:
 | Evento | Quando |
 | --- | --- |
 | `PageView` | a pessoa abre a LP |
-| `Lead` | **a conversão** — a pessoa é mandada pro jogo |
+| `Reencaminhado` | **a conversão** — a pessoa é mandada pro jogo |
 
 O ID do pixel vem de `VITE_META_PIXEL_ID` (vazio = o padrão embutido no arquivo).
+
+> ⚠️ `Reencaminhado` é evento **personalizado** (`trackCustom`) — não está na
+> lista fechada de eventos padrão do Meta. Pra otimizar campanha por ele é
+> preciso criar uma **Conversão personalizada** no Events Manager apontando pra
+> esse nome.
 
 > ⚠️ **Se sobrou tag do pixel do Meta dentro do GTM (`GTM-TL5N76RP`), pause ela.**
 > O container continua carregado pro lado Google, mas o pixel não depende mais
@@ -140,11 +145,21 @@ Ele foi tirado do GTM porque enquanto dependeu de tag no container, mudança na
 página derrubava o disparo **em silêncio**: o vídeo saiu, o botão sumiu, as tags
 que disparavam por eles morreram e ninguém percebeu.
 
-O que vai junto: `external_id` (o `visitor_id`, no `init` — é o único dado de
-identificação que a LP tem, ela não pede e-mail nem telefone) e `event_id` (no
-`eventID` do `track`, pra deduplicar com um envio server-side no futuro). O
-`fbclid` da URL é capturado na montagem da página — se não for lido ali, some,
-porque a LP navega pra fora em segundos; ele e o `fbc`/`fbp` vão pro banco.
+**O que vai junto dos dois eventos:**
+
+- **Advanced Matching:** `external_id` (o `visitor_id`) e `country` (deduzido do
+  fuso do navegador). São os únicos dois da lista fechada do Meta que a LP tem
+  como preencher — e-mail, telefone, nome, nascimento, cidade, estado e CEP
+  exigem dados que uma tela de redirect de 4s simplesmente não coleta.
+- **`fbc`/`fbp`:** não são parâmetros — o pixel lê os cookies sozinho. O `fbc`
+  nasce do `?fbclid=` na URL, e é o que mais pesa na correspondência; por isso a
+  LP **devolve pra URL** o `fbclid` de quem clicou num anúncio nos últimos 90
+  dias e voltou por outro caminho, deixando o pixel montar o cookie.
+- **IP e user agent:** o Meta preenche sozinho no lado dele.
+- **Parâmetros personalizados:** influencer, rede social, device, UTMs e
+  `campaign_id`/`adset_id`/`ad_id` — mais `redirect_mode` e `tempo_na_pagina_ms`
+  na conversão.
+- **`eventID`:** nos dois eventos, pra deduplicar com um envio server-side.
 
 Duas garantias na saída pro jogo:
 
