@@ -27,8 +27,12 @@
     'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
     })(window,document,'script','dataLayer','GTM-TL5N76RP');</script>
     <!-- End Google Tag Manager (SantaGroup) -->
-    <!-- Pixel do Meta agora é gerenciado 100% dentro do GTM (GTM-TL5N76RP),
-         disparado pelos eventos do dataLayer (video_play, entrou_no_jogo, etc.) -->
+    <!-- Pixel do Meta: mora no CÓDIGO, em src/lib/metaPixel.ts. São dois
+         disparos e só dois — PageView na abertura da LP e Lead na saída pro
+         jogo. Não é mais gerenciado pelo GTM: enquanto dependeu de tag no
+         container, qualquer mudança na página derrubava o disparo em silêncio.
+         ⚠️ Se sobrou tag do pixel do Meta dentro do GTM-TL5N76RP, PAUSE ela —
+         senão o mesmo evento é contado duas vezes. -->
     </head>
   <body>
     <!-- Google Tag Manager (noscript) - SantaGroup -->

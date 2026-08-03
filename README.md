@@ -122,34 +122,42 @@ Duas coisas garantem que "redirecionados" não seja subestimado:
 
 ## Pixel do Meta e rastreamento de anúncio
 
-O pixel **não fica no código** — ele é gerenciado dentro do GTM (`GTM-TL5N76RP`)
-desde jun/2026. O site só empurra eventos pro `dataLayer`:
+O pixel fica **no código** (`src/lib/metaPixel.ts`) e dispara **dois eventos, só
+dois**:
 
 | Evento | Quando |
 | --- | --- |
-| `page_view` | abertura da LP |
-| `entrou_no_jogo` | **a conversão** — saída pro jogo |
-| `redirect_auto` / `redirect_manual` | diagnóstico interno; **não é conversão** |
+| `PageView` | a pessoa abre a LP |
+| `Lead` | **a conversão** — a pessoa é mandada pro jogo |
 
-Junto vão os identificadores que o Meta precisa pra ligar a conversão ao anúncio:
-`external_id` (o `visitor_id`), `event_id` (deduplicação com envio server-side) e
-`fbc`/`fbp`. O `fbclid` da URL é capturado na montagem da página — se não for lido
-ali, some, porque a LP navega pra fora em segundos.
+O ID do pixel vem de `VITE_META_PIXEL_ID` (vazio = o padrão embutido no arquivo).
+
+> ⚠️ **Se sobrou tag do pixel do Meta dentro do GTM (`GTM-TL5N76RP`), pause ela.**
+> O container continua carregado pro lado Google, mas o pixel não depende mais
+> dele — tag do Meta ligada lá significa o mesmo evento contado duas vezes.
+
+Ele foi tirado do GTM porque enquanto dependeu de tag no container, mudança na
+página derrubava o disparo **em silêncio**: o vídeo saiu, o botão sumiu, as tags
+que disparavam por eles morreram e ninguém percebeu.
+
+O que vai junto: `external_id` (o `visitor_id`, no `init` — é o único dado de
+identificação que a LP tem, ela não pede e-mail nem telefone) e `event_id` (no
+`eventID` do `track`, pra deduplicar com um envio server-side no futuro). O
+`fbclid` da URL é capturado na montagem da página — se não for lido ali, some,
+porque a LP navega pra fora em segundos; ele e o `fbc`/`fbp` vão pro banco.
 
 Duas garantias na saída pro jogo:
 
-- a conversão espera a tag do GTM **confirmar o disparo** (`eventCallback`) antes
-  de navegar, com teto de 600ms. Sem isso o navegador cancelava o beacon do pixel
-  e a conversão nunca chegava ao Meta — o painel contava redirecionamentos que o
-  Events Manager não via;
+- a navegação espera o beacon do pixel sair, com teto de 600ms. Sem isso o
+  navegador cancelava a requisição e a conversão nunca chegava ao Meta — o painel
+  contava redirecionamentos que o Events Manager não via;
 - se as migrations novas não tiverem rodado, a escrita cai pro conjunto básico de
   colunas em vez de falhar inteira.
 
-> **O que configurar no GTM está em [`docs/pixel-meta-gtm.md`](docs/pixel-meta-gtm.md)** —
-> inclui o contrato do `dataLayer`, o passo a passo das tags e como testar. Esse
-> documento também explica por que a conversão de redirect, sozinha, é um sinal
-> fraco pra otimização, e onde está o sinal quente de verdade (`robux_spent` /
-> `play_time` em `coupon_usages`, via Conversions API).
+> **Detalhes e como testar em [`docs/pixel-meta.md`](docs/pixel-meta.md)**.
+> Esse documento também explica por que a conversão de redirect, sozinha, é um
+> sinal fraco pra otimização, e onde está o sinal quente de verdade
+> (`robux_spent` / `play_time` em `coupon_usages`, via Conversions API).
 
 ---
 
