@@ -52,13 +52,17 @@ Pegue a URL e a chave em **Supabase → Project Settings → Data API**
 ### 2. Migrations do banco
 
 No **SQL Editor** do Supabase, rode os arquivos de `supabase/migrations/` em ordem.
-Todos são idempotentes (pode rodar de novo sem quebrar nada). A mais recente,
-`20260801_add_redirect_tracking_to_lp_roblox.sql`, cria as colunas que separam
-redirect automático de clique manual no painel.
+Todos são idempotentes (pode rodar de novo sem quebrar nada). As duas mais recentes:
 
-> Enquanto essa migration não roda, a LP continua funcionando e ainda registra a
-> conversão — ela só não consegue gravar **como** a pessoa saiu, e o painel mostra
-> tudo como "LP antiga". O console avisa quando isso acontece.
+| Migration | O que cria |
+| --- | --- |
+| `20260801_add_redirect_tracking_to_lp_roblox.sql` | colunas que separam redirect automático de clique manual no painel |
+| `20260803_add_meta_ad_identifiers_to_lp_roblox.sql` | identificadores de anúncio do Meta (`fbclid`, `fbc`, `fbp`, `conversion_event_id`, `campaign_params`) |
+
+> Enquanto elas não rodam, a LP continua funcionando e ainda registra a conversão:
+> o código tenta gravar com as colunas novas e, se o banco recusar, repete sem
+> elas. Perde-se o detalhe (como a pessoa saiu, de qual anúncio veio), nunca o
+> registro do visitante nem a conversão. O console avisa quando isso acontece.
 
 ### 3. Resto no painel
 
@@ -113,6 +117,39 @@ Duas coisas garantem que "redirecionados" não seja subestimado:
 - o redirect tem um `setTimeout` de segurança além do `requestAnimationFrame`, que o
   navegador **pausa** em aba de segundo plano. Sem ele, quem abria o link numa aba
   de fundo nunca era redirecionado e entrava na conta como "saiu antes".
+
+---
+
+## Pixel do Meta e rastreamento de anúncio
+
+O pixel **não fica no código** — ele é gerenciado dentro do GTM (`GTM-TL5N76RP`)
+desde jun/2026. O site só empurra eventos pro `dataLayer`:
+
+| Evento | Quando |
+| --- | --- |
+| `page_view` | abertura da LP |
+| `entrou_no_jogo` | **a conversão** — saída pro jogo |
+| `redirect_auto` / `redirect_manual` | diagnóstico interno; **não é conversão** |
+
+Junto vão os identificadores que o Meta precisa pra ligar a conversão ao anúncio:
+`external_id` (o `visitor_id`), `event_id` (deduplicação com envio server-side) e
+`fbc`/`fbp`. O `fbclid` da URL é capturado na montagem da página — se não for lido
+ali, some, porque a LP navega pra fora em segundos.
+
+Duas garantias na saída pro jogo:
+
+- a conversão espera a tag do GTM **confirmar o disparo** (`eventCallback`) antes
+  de navegar, com teto de 600ms. Sem isso o navegador cancelava o beacon do pixel
+  e a conversão nunca chegava ao Meta — o painel contava redirecionamentos que o
+  Events Manager não via;
+- se as migrations novas não tiverem rodado, a escrita cai pro conjunto básico de
+  colunas em vez de falhar inteira.
+
+> **O que configurar no GTM está em [`docs/pixel-meta-gtm.md`](docs/pixel-meta-gtm.md)** —
+> inclui o contrato do `dataLayer`, o passo a passo das tags e como testar. Esse
+> documento também explica por que a conversão de redirect, sozinha, é um sinal
+> fraco pra otimização, e onde está o sinal quente de verdade (`robux_spent` /
+> `play_time` em `coupon_usages`, via Conversions API).
 
 ---
 

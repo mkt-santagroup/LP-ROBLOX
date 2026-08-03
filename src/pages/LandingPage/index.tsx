@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Clouds } from '../../components/Clouds';
 import { getInfluencerBySlug, slugify } from '../../lib/influencers';
 import { fetchAppConfig, fallbackConfig, isValidUrl } from '../../lib/appConfig';
-import { useRobloxAnalytics } from '../../hooks/useRobloxAnalytics';
+import { useRobloxAnalytics, TRACKING_FLUSH_MS } from '../../hooks/useRobloxAnalytics';
 import styles from './Redirect.module.css';
 
 //
@@ -19,16 +19,16 @@ import styles from './Redirect.module.css';
 //     usando o link do .env / o padrão do código.
 //  2. O link vem, nessa ordem: influencer > config global do painel > .env > padrão.
 //  3. A conversão (entrou_no_jogo) é enviada ANTES de navegar, com um teto de
-//     espera curto pra não segurar a pessoa na tela. A gravação em si vai com
-//     `keepalive`, então ela termina mesmo depois de a página sair do ar — o
-//     teto só cobre a espera pelo cadastro do visitante.
+//     espera curto pra não segurar a pessoa na tela. O teto cobre os dois lados
+//     da conversão: a gravação no banco e o disparo da tag do pixel no GTM.
+//     A gravação em si vai com `keepalive` e termina mesmo depois de a página
+//     sair do ar; a tag do pixel NÃO tem essa garantia — se a gente navegar
+//     antes dela disparar, o navegador cancela e a conversão nunca chega ao
+//     Meta. Por isso o teto agora espera as duas coisas, não só o banco.
 //  4. A saída é registrada com o MODO ('auto' quando o timer estoura sozinho,
 //     'manual' quando a pessoa toca no link de escape antes disso). É o que
 //     separa, no painel, quem foi redirecionado de quem teve que clicar.
 //
-
-/** Teto de espera pelo envio da conversão antes de navegar pra fora. */
-const TRACKING_FLUSH_MS = 600;
 
 export const LandingPage = () => {
   // Captura a origem do tráfego da URL: /:influencer/:social
