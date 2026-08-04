@@ -18,13 +18,13 @@ import styles from './Redirect.module.css';
 //     a config demorar, se o tracking falhar — o timer dispara mesmo assim,
 //     usando o link do .env / o padrão do código.
 //  2. O link vem, nessa ordem: influencer > config global do painel > .env > padrão.
-//  3. A conversão (entrou_no_jogo) é enviada ANTES de navegar, com um teto de
-//     espera curto pra não segurar a pessoa na tela. O teto cobre os dois lados
-//     da conversão: a gravação no banco e o disparo da tag do pixel no GTM.
-//     A gravação em si vai com `keepalive` e termina mesmo depois de a página
-//     sair do ar; a tag do pixel NÃO tem essa garantia — se a gente navegar
-//     antes dela disparar, o navegador cancela e a conversão nunca chega ao
-//     Meta. Por isso o teto agora espera as duas coisas, não só o banco.
+//  3. A conversão é enviada ANTES de navegar, com um teto de espera curto pra
+//     não segurar a pessoa na tela. O teto cobre os dois lados da conversão: a
+//     gravação no banco e o disparo do pixel do Meta. A gravação em si vai com
+//     `keepalive` e termina mesmo depois de a página sair do ar; o pixel NÃO
+//     tem essa garantia — se a gente navegar antes do beacon sair, o navegador
+//     cancela e a conversão nunca chega ao Meta. Por isso o teto espera as duas
+//     coisas, não só o banco.
 //  4. A saída é registrada com o MODO ('auto' quando o timer estoura sozinho,
 //     'manual' quando a pessoa toca no link de escape antes disso). É o que
 //     separa, no painel, quem foi redirecionado de quem teve que clicar.
@@ -34,9 +34,9 @@ export const LandingPage = () => {
   // Captura a origem do tráfego da URL: /:influencer/:social
   const { influencer, social } = useParams();
 
-  // `null` no lugar do videoRef: esta página não tem vídeo, então o hook só
-  // registra o acesso (pageview + visitante) e a conversão.
-  const { trackRedirect } = useRobloxAnalytics(null, { influencer, social });
+  // Registra o acesso (PageView do pixel + visitante no banco) e devolve o
+  // disparo da conversão, usado na saída pro jogo.
+  const { trackRedirect } = useRobloxAnalytics({ influencer, social });
 
   // Começa já com o fallback (.env / padrão) pra nunca existir um instante em
   // que a página não saiba pra onde ir.

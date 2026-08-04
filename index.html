@@ -20,21 +20,24 @@
          a pessoa ver tela em branco e sair antes do redirect. -->
     <link rel="preload" as="image" href="/background.png">
 
-    <!-- Google Tag Manager (SantaGroup) -->
-    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-TL5N76RP');</script>
-    <!-- End Google Tag Manager (SantaGroup) -->
-    <!-- Pixel do Meta agora é gerenciado 100% dentro do GTM (GTM-TL5N76RP),
-         disparado pelos eventos do dataLayer (video_play, entrou_no_jogo, etc.) -->
+    <!-- Rastreamento desta página: só o pixel do Meta, e ele mora no CÓDIGO,
+         em src/lib/metaPixel.ts. São dois disparos e só dois — PageView na
+         abertura da LP e Reencaminhado na saída pro jogo.
+
+         O GTM (GTM-TL5N76RP) foi REMOVIDO em 03/ago. Ele era o único jeito de
+         o pixel disparar, e virou o problema: quando o vídeo saiu da página
+         (01/ago), as tags amarradas nele morreram em silêncio e a conversão
+         praticamente parou — 56 aberturas de página pra 3 conversões em 24h.
+         Pior, tags de "assistiu 10/25/50/75/90% do vídeo" continuavam
+         disparando por gatilho de TEMPO numa página que não tem mais vídeo:
+         ~193 eventos falsos por dia, que entravam nos públicos de remarketing
+         como se fossem gente engajada.
+
+         Com o pixel no código, o que dispara está escrito aqui e é testável.
+         Se um dia entrar Google Analytics ou Google Ads, o caminho é a tag
+         própria de cada um — não um container que ninguém audita. -->
     </head>
   <body>
-    <!-- Google Tag Manager (noscript) - SantaGroup -->
-    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TL5N76RP"
-    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-    <!-- End Google Tag Manager (noscript) - SantaGroup -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

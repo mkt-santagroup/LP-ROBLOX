@@ -176,6 +176,68 @@ export function captureAdParams(search: string = window.location.search): void {
 }
 
 /**
+ * Janela do `fbc`: 90 dias, a MESMA que o pixel usa no cookie `_fbc`
+ * (o `fbevents.js` guarda 2160 horas). Clique mais velho que isso está fora da
+ * janela de atribuição do Meta — restaurar não ajudaria e ainda mandaria um
+ * dado velho como se fosse recente.
+ */
+const FBC_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+
+/**
+ * Devolve o `fbclid` do último clique em anúncio pra URL, quando esta visita
+ * não trouxe um.
+ *
+ * Por que isso existe: o `fbc` é o parâmetro que MAIS pesa na qualidade da
+ * correspondência de eventos (+32% no diagnóstico do Events Manager), e quem
+ * cria esse valor é o pixel — mas só se achar `?fbclid=` na URL ou o cookie
+ * `_fbc` já pronto. Quem clicou no anúncio ontem e hoje voltou pelo link do
+ * influencer chega sem nenhum dos dois, e a conversão sai sem `fbc`.
+ *
+ * A gente devolve o `fbclid` pra query string e deixa o PIXEL fazer o resto.
+ * É de propósito que não escrevemos o cookie `_fbc` na mão: o pixel escolhe o
+ * domínio do cookie subindo pelos níveis do host até achar o mais amplo que
+ * cola, e um cookie nosso num escopo diferente viraria DOIS `_fbc` com o mesmo
+ * nome — sem jeito confiável de saber qual vale. Mexendo só na URL, quem grava
+ * continua sendo o pixel, no escopo dele e no formato dele.
+ *
+ * Precisa rodar ANTES do `fbq('init')`. Devolve se restaurou algo.
+ */
+export function restoreFbclidToUrl(): boolean {
+  try {
+    // Veio fbclid nesta visita: o pixel resolve sozinho, não temos o que fazer.
+    const url = new URL(window.location.href);
+    if ((url.searchParams.get('fbclid') ?? '').trim()) return false;
+
+    // O cookie do pixel já existe (visita recente): idem.
+    if (readCookie('_fbc')) return false;
+
+    // `fb.1.<criado_em_ms>.<fbclid>` — o que guardamos no primeiro clique.
+    const saved = safeGet(FBC_KEY);
+    if (!saved) return false;
+
+    const parts = saved.split('.');
+    if (parts.length < 4) return false;
+
+    const createdAt = Number(parts[2]);
+    if (!Number.isFinite(createdAt)) return false;
+    if (Date.now() - createdAt > FBC_MAX_AGE_MS) return false;
+
+    const fbclid = parts.slice(3).join('.');
+    if (!fbclid) return false;
+
+    url.searchParams.set('fbclid', fbclid);
+    // `replaceState` e não `pushState`: isto não é navegação, é só deixar o
+    // parâmetro visível pro pixel. Nada no app lê a query string, e a LP sai
+    // da página em segundos.
+    window.history.replaceState(window.history.state, '', url.toString());
+    return true;
+  } catch {
+    // URL estranha, history bloqueado: segue sem restaurar.
+    return false;
+  }
+}
+
+/**
  * Identidade do Meta pra este visitante, no melhor estado disponível AGORA.
  *
  * De propósito não é cacheada: o `_fbp` nasce quando o pixel roda, o que pode

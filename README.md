@@ -122,34 +122,57 @@ Duas coisas garantem que "redirecionados" não seja subestimado:
 
 ## Pixel do Meta e rastreamento de anúncio
 
-O pixel **não fica no código** — ele é gerenciado dentro do GTM (`GTM-TL5N76RP`)
-desde jun/2026. O site só empurra eventos pro `dataLayer`:
+O pixel fica **no código** (`src/lib/metaPixel.ts`) e dispara **dois eventos, só
+dois**:
 
 | Evento | Quando |
 | --- | --- |
-| `page_view` | abertura da LP |
-| `entrou_no_jogo` | **a conversão** — saída pro jogo |
-| `redirect_auto` / `redirect_manual` | diagnóstico interno; **não é conversão** |
+| `PageView` | a pessoa abre a LP |
+| `Reencaminhado` | **a conversão** — a pessoa é mandada pro jogo |
 
-Junto vão os identificadores que o Meta precisa pra ligar a conversão ao anúncio:
-`external_id` (o `visitor_id`), `event_id` (deduplicação com envio server-side) e
-`fbc`/`fbp`. O `fbclid` da URL é capturado na montagem da página — se não for lido
-ali, some, porque a LP navega pra fora em segundos.
+O ID do pixel vem de `VITE_META_PIXEL_ID` (vazio = o padrão embutido no arquivo).
+
+> ⚠️ `Reencaminhado` é evento **personalizado** (`trackCustom`) — não está na
+> lista fechada de eventos padrão do Meta. Pra otimizar campanha por ele é
+> preciso criar uma **Conversão personalizada** no Events Manager apontando pra
+> esse nome.
+
+**O GTM (`GTM-TL5N76RP`) foi removido da página em 03/ago.** Não há mais nenhuma
+camada de tag entre o código e o Meta. O diagnóstico que motivou isso, medido na
+Graph API do próprio pixel, está em [`docs/pixel-meta.md`](docs/pixel-meta.md) —
+em resumo: a conversão estava praticamente morta (56 pageviews para 3 conversões
+em 24h) e as tags órfãs da era do vídeo despejavam **~193 eventos falsos por
+dia** de "assistiu 10/25/50/75/90%" numa página sem vídeo, poluindo os públicos
+de remarketing.
+
+**O que vai junto dos dois eventos:**
+
+- **Advanced Matching:** `external_id` (o `visitor_id`) e `country` (deduzido do
+  fuso do navegador). São os únicos dois da lista fechada do Meta que a LP tem
+  como preencher — e-mail, telefone, nome, nascimento, cidade, estado e CEP
+  exigem dados que uma tela de redirect de 4s simplesmente não coleta.
+- **`fbc`/`fbp`:** não são parâmetros — o pixel lê os cookies sozinho. O `fbc`
+  nasce do `?fbclid=` na URL, e é o que mais pesa na correspondência; por isso a
+  LP **devolve pra URL** o `fbclid` de quem clicou num anúncio nos últimos 90
+  dias e voltou por outro caminho, deixando o pixel montar o cookie.
+- **IP e user agent:** o Meta preenche sozinho no lado dele.
+- **Parâmetros personalizados:** influencer, rede social, device, UTMs e
+  `campaign_id`/`adset_id`/`ad_id` — mais `redirect_mode` e `tempo_na_pagina_ms`
+  na conversão.
+- **`eventID`:** nos dois eventos, pra deduplicar com um envio server-side.
 
 Duas garantias na saída pro jogo:
 
-- a conversão espera a tag do GTM **confirmar o disparo** (`eventCallback`) antes
-  de navegar, com teto de 600ms. Sem isso o navegador cancelava o beacon do pixel
-  e a conversão nunca chegava ao Meta — o painel contava redirecionamentos que o
-  Events Manager não via;
+- a navegação espera o beacon do pixel sair, com teto de 600ms. Sem isso o
+  navegador cancelava a requisição e a conversão nunca chegava ao Meta — o painel
+  contava redirecionamentos que o Events Manager não via;
 - se as migrations novas não tiverem rodado, a escrita cai pro conjunto básico de
   colunas em vez de falhar inteira.
 
-> **O que configurar no GTM está em [`docs/pixel-meta-gtm.md`](docs/pixel-meta-gtm.md)** —
-> inclui o contrato do `dataLayer`, o passo a passo das tags e como testar. Esse
-> documento também explica por que a conversão de redirect, sozinha, é um sinal
-> fraco pra otimização, e onde está o sinal quente de verdade (`robux_spent` /
-> `play_time` em `coupon_usages`, via Conversions API).
+> **Detalhes e como testar em [`docs/pixel-meta.md`](docs/pixel-meta.md)**.
+> Esse documento também explica por que a conversão de redirect, sozinha, é um
+> sinal fraco pra otimização, e onde está o sinal quente de verdade
+> (`robux_spent` / `play_time` em `coupon_usages`, via Conversions API).
 
 ---
 

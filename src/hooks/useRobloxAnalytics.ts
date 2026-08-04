@@ -1,6 +1,7 @@
-import { useEffect, useRef, RefObject } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase, updateVisitorKeepalive } from '../lib/supabase';
 import { slugify, getInfluencerBySlug } from '../lib/influencers';
+import { initMetaPixel, trackMetaConversion, PIXEL_FLUSH_MS } from '../lib/metaPixel';
 import {
   captureAdParams,
   getCampaignParams,
@@ -8,11 +9,10 @@ import {
   getVisitorId,
 } from '../lib/metaIdentity';
 
-// Declarar as variáveis globais do Meta e GTM pro TypeScript não reclamar
+// Declarar a variável global do Meta pro TypeScript não reclamar
 declare global {
   interface Window {
     fbq: any;
-    dataLayer: any[];
   }
 }
 
@@ -30,61 +30,27 @@ const IP_LOOKUP_TIMEOUT_MS = 2000;
 /**
  * Teto de espera pelo tracking antes de navegar pra fora.
  *
- * Vale pros DOIS lados da conversão (gravação no banco e disparo do pixel via
- * GTM), e é sempre um TETO, não uma espera fixa: assim que os dois terminam, a
- * navegação acontece. Na prática o GTM já foi carregado lá no início da página
- * e a tag está quente quando a conversão dispara, então o normal é resolver em
- * bem menos que isso.
+ * Vale pros DOIS lados da conversão (a gravação no banco e o disparo do pixel),
+ * e é sempre um TETO, não uma espera fixa: assim que os dois terminam, a
+ * navegação acontece. A gravação vai com `keepalive` e sobrevive à saída da
+ * página; o pixel NÃO tem essa garantia — se a gente navegar antes do beacon
+ * sair, o navegador cancela e a conversão nunca chega ao Meta. Por isso o teto
+ * cobre os dois, e não só o banco.
  */
-export const TRACKING_FLUSH_MS = 600;
+export const TRACKING_FLUSH_MS = Math.max(600, PIXEL_FLUSH_MS + 200);
 
 /**
- * Empurra um evento pro GTM e espera as tags DELE dispararem.
+ * Tracking da LP de redirecionamento.
  *
- * `dataLayer.push` volta na hora — quem manda a requisição pro Meta é a tag, de
- * forma assíncrona. Como a LP navega pra fora logo em seguida, sem esperar por
- * isso o navegador CANCELA o beacon do pixel e a conversão nunca chega ao Meta.
- * Era esse o furo: o registro no banco já estava protegido com `keepalive`, o
- * lado do pixel não estava — então o painel contava redirecionamentos que o
- * Events Manager nunca via.
+ * São dois disparos pro Meta, e só dois (ver `lib/metaPixel.ts`):
+ *   PageView -> quando a pessoa abre a página;
+ *   Reencaminhado -> quando ela é mandada pro jogo.
  *
- * `eventCallback` é o retorno do próprio GTM avisando "as tags desse evento já
- * foram"; `eventTimeout` faz o GTM chamar esse retorno mesmo se alguma tag
- * travar. O `setTimeout` local cobre o caso de o GTM não existir (bloqueado por
- * adblock), quando callback nenhum viria.
+ * Não há mais nenhuma camada de tag entre o código e o Meta: o GTM saiu da
+ * página em 03/ago, junto com os eventos falsos que ele disparava.
  */
-function pushAndFlush(payload: Record<string, unknown>, timeoutMs: number): Promise<void> {
-  return new Promise((resolve) => {
-    if (!window.dataLayer) {
-      resolve();
-      return;
-    }
-
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-
-    window.dataLayer.push({ ...payload, eventTimeout: timeoutMs, eventCallback: finish });
-    setTimeout(finish, timeoutMs);
-  });
-}
-
-export function useRobloxAnalytics(
-  // `null` = página sem vídeo (a LP de redirecionamento). Todo o tracking de
-  // progresso de vídeo simplesmente não roda, o resto (pageview, conversão)
-  // continua igual.
-  videoRef: RefObject<HTMLVideoElement | null> | null,
-  origin?: TrackingOrigin
-) {
+export function useRobloxAnalytics(origin?: TrackingOrigin) {
   const visitorId = useRef<string>('');
-  const clickCalmaCount = useRef<number>(0);
-  const highestExactProgress = useRef<number>(0);
-  const highestMaxProgress = useRef<number>(0);
-  // Garante que o "Play" (click_start + pixel) seja contado UMA vez, no play real
-  const playStartedRef = useRef<boolean>(false);
 
   // Toques no link de escape ("Não abriu? Toque aqui pra entrar")
   const manualClicks = useRef<number>(0);
@@ -93,12 +59,6 @@ export function useRobloxAnalytics(
   // Resolve quando a linha do visitante já existe no banco. A saída pro jogo
   // espera por isso — um UPDATE numa linha que ainda não nasceu não grava nada.
   const visitorReady = useRef<Promise<void> | null>(null);
-
-  // Controle para disparar o PageView apenas uma vez por carregamento
-  const pageViewFired = useRef<boolean>(false);
-
-  // Usar um Set local para a sessão atual, assim o pixel dispara sempre que você testar (dar F5)
-  const sessionMilestones = useRef<Set<number>>(new Set());
 
   const getDeviceType = () => {
     const ua = navigator.userAgent;
@@ -124,6 +84,26 @@ export function useRobloxAnalytics(
   // Rede social padronizada em minúsculo (instagram, tiktok, youtube...)
   const rawSocial = cleanSlug(origin?.social)?.toLowerCase() ?? null;
 
+  /**
+   * Contexto que acompanha os DOIS eventos do pixel.
+   *
+   * Isto não é Advanced Matching (esse é montado em `metaPixel.ts` e só aceita
+   * a lista fechada do Meta) — são parâmetros personalizados, que aparecem no
+   * Events Manager e servem pra montar Conversões personalizadas e públicos
+   * ("quem veio do TikTok do fulano", "quem teve que clicar no link manual").
+   *
+   * Os `utm_*` e os ids de campanha/conjunto/anúncio vêm da URL do anúncio e
+   * são o que permite, depois, dizer qual ANÚNCIO específico trouxe quem
+   * converteu.
+   */
+  const eventParams = (extra?: Record<string, unknown>) => ({
+    ...(getCampaignParams() ?? {}),
+    influencer: rawInfluencerSlug,
+    rede_social: rawSocial,
+    device: getDeviceType(),
+    ...extra,
+  });
+
   // Devolve a promise pra quem precisar esperar a gravação terminar antes de
   // navegar pra fora (a LP de redirect faz isso, com timeout). Nunca lança:
   // se o banco estiver fora do ar, o tracking falha em silêncio e a página segue.
@@ -146,16 +126,6 @@ export function useRobloxAnalytics(
     }
   };
 
-  // Marca o início do vídeo (Play) só uma vez — disparado no play real do vídeo,
-  // independente de ter sido pelo CTA ou pelo botão do player.
-  const markPlayStarted = () => {
-    if (playStartedRef.current) return;
-    playStartedRef.current = true;
-    console.log(`%c[TRACKING] dataLayer -> video_play`, "color: #f59e0b; font-weight: bold;");
-    if (window.dataLayer) window.dataLayer.push({ event: 'video_play' });
-    updateSession({ click_start: true });
-  };
-
   useEffect(() => {
     // ANTES de qualquer coisa: os parâmetros do anúncio (fbclid, utm_*) só
     // existem na URL deste acesso, e esta página navega pra fora em segundos.
@@ -164,6 +134,22 @@ export function useRobloxAnalytics(
 
     const currentVisitorId = getVisitorId();
     visitorId.current = currentVisitorId;
+
+    // ===== DISPARO 1 DE 2: PageView =====
+    // Logo aqui, antes de qualquer ida ao banco: é o pixel que cria o cookie
+    // `_fbp`, e a conversão (~4s depois) só manda esse identificador se ele já
+    // tiver nascido. Nada nesta linha depende do Supabase — se o banco estiver
+    // fora do ar, o pixel dispara do mesmo jeito.
+    //
+    // Os parâmetros usam o slug CRU da URL, sem esperar a validação no banco:
+    // o pixel não pode ficar atrás de uma ida ao Supabase. Se o influenciador
+    // não existir cadastrado, o painel trata como acesso normal — o parâmetro
+    // no evento continua sendo a informação verdadeira de por onde a pessoa veio.
+    initMetaPixel({
+      externalId: currentVisitorId,
+      eventId: crypto.randomUUID(),
+      params: eventParams(),
+    });
 
     // Busca o IP numa API externa. Bounded: se ela demorar/cair, o cadastro do
     // visitante segue sem IP em vez de ficar preso esperando.
@@ -185,26 +171,8 @@ export function useRobloxAnalytics(
       const identity = getMetaIdentity();
       const campaign = getCampaignParams();
 
-      // --- LOG DE TRACKING (PAGEVIEW) ---
-      if (!pageViewFired.current) {
-        console.log(`%c[TRACKING] Disparando evento: PageView`, "color: #3b82f6; font-weight: bold;");
-        if (identity.fbclid) {
-          console.log(`%c[TRACKING] Veio de anúncio — fbclid capturado.`, "color: #3b82f6;");
-        }
-        // A identidade vai junto do primeiro evento pra ficar disponível no
-        // modelo de dados do GTM desde o começo — qualquer tag posterior
-        // consegue ler, sem depender de a gente repetir em todo push.
-        // O `fbp` costuma vir null aqui (o pixel ainda não rodou); ele é lido de
-        // novo na conversão, e o push de lá sobrescreve este.
-        if (window.dataLayer) {
-          window.dataLayer.push({
-            event: 'page_view',
-            external_id: identity.externalId,
-            fbc: identity.fbc,
-            fbp: identity.fbp,
-          });
-        }
-        pageViewFired.current = true;
+      if (identity.fbclid) {
+        console.log(`%c[TRACKING] Veio de anúncio — fbclid capturado.`, "color: #3b82f6;");
       }
 
       const deviceType = getDeviceType();
@@ -274,9 +242,6 @@ export function useRobloxAnalytics(
           console.log(`%c[TRACKING] Origem: ${influencer}${social ? ` / ${social}` : ''}`, "color: #a855f7; font-weight: bold;");
         }
       } else {
-        clickCalmaCount.current = data.click_calma || 0;
-        highestExactProgress.current = data.exact_percentage_viewed || 0;
-        highestMaxProgress.current = data.max_percentage_viewed || 0;
         manualClicks.current = data.manual_clicks || 0;
 
         const basePayload: any = {
@@ -323,62 +288,7 @@ export function useRobloxAnalytics(
     });
   }, []);
 
-  useEffect(() => {
-    const video = videoRef?.current;
-    // Página sem vídeo (LP de redirect) ou vídeo ainda não montado: nada a fazer.
-    if (!video) return;
-
-    const handleTimeUpdate = () => {
-      if (!video.duration || video.duration === 0) return;
-
-      const progress = (video.currentTime / video.duration) * 100;
-      const currentRounded = Math.floor(progress);
-
-      if (currentRounded > highestExactProgress.current) {
-        highestExactProgress.current = currentRounded;
-        updateSession({ exact_percentage_viewed: currentRounded });
-      }
-
-      const checkPoints = [25, 50, 75, 95, 100];
-      checkPoints.forEach((point) => {
-        const threshold = point === 100 ? 99 : point;
-
-        if (progress >= threshold && !sessionMilestones.current.has(point)) {
-          sessionMilestones.current.add(point);
-
-          // --- LOG DE TRACKING (PORCENTAGEM) ---
-          console.log(`%c[TRACKING] dataLayer -> video_progress ${point}%`, "color: #f59e0b; font-weight: bold;");
-
-          if (window.dataLayer) window.dataLayer.push({ event: 'video_progress', percent: point });
-
-          if (point > highestMaxProgress.current) {
-            highestMaxProgress.current = point;
-            updateSession({ max_percentage_viewed: point });
-          }
-        }
-      });
-    };
-
-    video.addEventListener('timeupdate', handleTimeUpdate);
-    video.addEventListener('play', markPlayStarted); // <-- Play real do vídeo marca o "Deram Play"
-    return () => {
-      video.removeEventListener('timeupdate', handleTimeUpdate);
-      video.removeEventListener('play', markPlayStarted);
-    };
-  }, [videoRef, videoRef?.current]); // <-- AQUI ESTÁ A MÁGICA: Adicionado videoRef.current de volta!
-
   return {
-    // Mantido por compatibilidade — o Play real é marcado pelo evento 'play' do vídeo.
-    // Chamar aqui é idempotente (só conta uma vez).
-    trackStartClick: () => markPlayStarted(),
-    trackBlockedClick: () => {
-      clickCalmaCount.current += 1;
-      // Clique enquanto BLOQUEADO (calma) — evento separado, NÃO é conversão.
-      console.log(`%c[TRACKING] dataLayer -> clique_bloqueado (NÃO é conversão)`, "color: #ef4444; font-weight: bold;");
-      if (window.dataLayer) window.dataLayer.push({ event: 'clique_bloqueado' });
-      updateSession({ click_calma: clickCalmaCount.current });
-    },
-
     /**
      * Saída pro jogo — a conversão da LP de redirecionamento.
      *
@@ -394,8 +304,9 @@ export function useRobloxAnalytics(
       if (mode === 'manual') manualClicks.current += 1;
 
       // O modo da saída já foi gravado: um toque no link depois disso é a
-      // pessoa insistindo porque o automático não pegou. Não reescreve o modo —
-      // só engrossa o contador de toques, que é o sinal de redirect travado.
+      // pessoa insistindo porque o automático não pegou. Não reescreve o modo,
+      // nem repete o pixel (a conversão é UMA por acesso) — só engrossa o
+      // contador de toques, que é o sinal de redirect travado.
       if (redirectTracked.current) {
         return updateVisitorKeepalive(visitorId.current, { manual_clicks: manualClicks.current });
       }
@@ -412,30 +323,19 @@ export function useRobloxAnalytics(
       // segundos da tela de espera, então ele normalmente já está lá.
       const identity = getMetaIdentity();
 
-      console.log(`%c[TRACKING] dataLayer -> redirect_${mode} + entrou_no_jogo (CONVERSÃO)`, "color: #22c55e; font-weight: bold;");
-
-      // A conversão é o ÚNICO evento cuja tag a gente espera antes de navegar —
-      // é o que impede o navegador de cancelar o beacon do pixel na saída.
-      // Começa AGORA, antes das esperas do banco, pra ter o máximo de tempo.
-      const pixelFlushed = pushAndFlush(
-        {
-          // Nome que o pixel/GTM já escutam. Não mexer.
-          event: 'entrou_no_jogo',
-          // Deduplicação com o envio server-side.
-          event_id: eventId,
-          // Quem é a pessoa, no vocabulário do Meta.
-          external_id: identity.externalId,
-          fbc: identity.fbc,
-          fbp: identity.fbp,
-          // Contexto, pro GTM poder separar sem precisar de outro evento.
+      // ===== DISPARO 2 DE 2: a conversão =====
+      // Começa AGORA, antes das esperas do banco, pra ter o máximo de tempo de
+      // beacon antes de a página navegar pra fora.
+      const pixelFlushed = trackMetaConversion({
+        eventId,
+        params: eventParams({
+          // Como a pessoa saiu: sozinha no timer ou tocando no link de escape.
           redirect_mode: mode,
-        },
-        TRACKING_FLUSH_MS,
-      );
-
-      // Detalhe do modo — é diagnóstico interno, não conversão: não segura a
-      // navegação esperando a tag dele.
-      if (window.dataLayer) window.dataLayer.push({ event: `redirect_${mode}` });
+          // Quanto tempo ela ficou na tela de espera. Serve pra separar, no
+          // Events Manager, quem esperou de quem saiu correndo.
+          tempo_na_pagina_ms: Math.round(performance.now()),
+        }),
+      });
 
       // A linha do visitante nasce de forma assíncrona no primeiro acesso. Sem
       // esperar por ela, um redirect rápido faria o UPDATE não achar linha
