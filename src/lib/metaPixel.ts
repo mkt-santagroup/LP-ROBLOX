@@ -12,8 +12,10 @@
 // código, o que dispara está escrito no repositório e dá pra ler, testar e
 // versionar junto com a LP.
 //
-// ⚠️ Se ainda existir uma tag do pixel do Meta dentro do GTM-TL5N76RP, ela
-//    precisa ser PAUSADA — senão o mesmo evento é contado duas vezes.
+// O GTM saiu da página em 03/ago (ver index.html): além de ser o ponto único de
+// falha do pixel, ele disparava ~193 eventos falsos de "assistiu vídeo" por dia
+// numa página que não tem vídeo. Não existe mais nenhuma camada de tag entre
+// este arquivo e o Meta.
 //
 // ---------------------------------------------------------------------------
 // O QUE VAI JUNTO DOS EVENTOS (qualidade da correspondência)

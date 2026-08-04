@@ -137,13 +137,13 @@ O ID do pixel vem de `VITE_META_PIXEL_ID` (vazio = o padrão embutido no arquivo
 > preciso criar uma **Conversão personalizada** no Events Manager apontando pra
 > esse nome.
 
-> ⚠️ **Se sobrou tag do pixel do Meta dentro do GTM (`GTM-TL5N76RP`), pause ela.**
-> O container continua carregado pro lado Google, mas o pixel não depende mais
-> dele — tag do Meta ligada lá significa o mesmo evento contado duas vezes.
-
-Ele foi tirado do GTM porque enquanto dependeu de tag no container, mudança na
-página derrubava o disparo **em silêncio**: o vídeo saiu, o botão sumiu, as tags
-que disparavam por eles morreram e ninguém percebeu.
+**O GTM (`GTM-TL5N76RP`) foi removido da página em 03/ago.** Não há mais nenhuma
+camada de tag entre o código e o Meta. O diagnóstico que motivou isso, medido na
+Graph API do próprio pixel, está em [`docs/pixel-meta.md`](docs/pixel-meta.md) —
+em resumo: a conversão estava praticamente morta (56 pageviews para 3 conversões
+em 24h) e as tags órfãs da era do vídeo despejavam **~193 eventos falsos por
+dia** de "assistiu 10/25/50/75/90%" numa página sem vídeo, poluindo os públicos
+de remarketing.
 
 **O que vai junto dos dois eventos:**
 

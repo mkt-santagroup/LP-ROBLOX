@@ -136,28 +136,46 @@ em produção, faça rebuild + deploy.
 
 ---
 
-## 4. ⚠️ O GTM
+## 4. O GTM foi removido (03/ago)
 
-O container `GTM-TL5N76RP` continua carregado na página, mas **não gerencia mais
-o pixel do Meta**.
+O container `GTM-TL5N76RP` **não está mais na página**. Não existe nenhuma
+camada de tag entre o código e o Meta.
 
-**Se ainda existir uma tag do pixel do Meta lá dentro, pause ela.** Duas tags
-disparando o mesmo evento = conversão contada em dobro, e o `eventID` não
-resolve isso (ele deduplica navegador × servidor, não navegador × navegador).
+### Por quê — os números que decidiram
 
-O site ainda empurra `page_view` e `entrou_no_jogo` pro `dataLayer`, mas só pro
-lado Google (GA4 / Google Ads). Nada do Meta depende deles.
+Diagnóstico feito em 03/ago pela Graph API (`/{pixel_id}/stats`), últimas 24h do
+pixel `Pixel SG - Roblox #01`:
 
-### Por que saiu do GTM
+| Evento | 24h |
+| --- | --- |
+| PageView | 56 |
+| ViewContent10 / 25 / 50 / 75 | 41 cada |
+| ViewContent90 | 29 |
+| **Lead** (a conversão) | **3** |
 
-O pixel virou tag de GTM em jun/2026. Em 01/ago a LP virou redirect direto: o
-vídeo e o botão de CTA foram removidos, e com eles sumiram os eventos
-`video_play`, `video_progress`, `clique_bloqueado` e a classe `state_unlock`.
+Duas coisas saltam:
 
-Qualquer tag amarrada nesses gatilhos **morreu em silêncio** — do lado do site
-tudo parecia certo e o Events Manager não recebia nada. Foi essa a causa provável
-do "perdemos o pixel". Com o pixel no código, o que dispara está escrito no
-repositório: dá pra ler, testar e versionar junto com a LP.
+**1. A conversão estava morta.** 56 aberturas de página, 3 conversões. Numa LP
+onde ~100% de quem abre é redirecionado, `Lead` deveria acompanhar o PageView.
+As tags de conversão dependiam de gatilhos que morreram quando o vídeo saiu da
+página em 01/ago (`video_play`, `video_progress`, `clique_bloqueado`, classe
+`state_unlock`) — morreram **em silêncio**, com o site parecendo saudável.
+
+**2. ~193 eventos falsos por dia.** Os `ViewContent10..90` disparavam em bloco,
+praticamente um conjunto completo por pageview, numa página **sem vídeo desde
+01/ago**. O `ViewContent90` ficava pra trás (29 contra 41) porque a página
+redireciona antes do último gatilho de tempo — a assinatura de tags em **gatilho
+de tempo**, sobras da era do vídeo.
+
+O custo disso não é cosmético: `ViewContent` é evento **padrão** do Meta, usado
+em otimização e público de remarketing. Os públicos estavam sendo montados em
+cima de gente que "assistiu 75% de um vídeo" inexistente — sinal 4× mais poluído
+que limpo.
+
+### Se um dia precisar de Google Analytics / Google Ads
+
+O caminho é a tag própria de cada um, direto no `index.html`. Um container que
+ninguém audita foi exatamente o que produziu os dois problemas acima.
 
 ---
 

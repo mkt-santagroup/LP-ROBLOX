@@ -9,11 +9,10 @@ import {
   getVisitorId,
 } from '../lib/metaIdentity';
 
-// Declarar as variáveis globais do Meta e GTM pro TypeScript não reclamar
+// Declarar a variável global do Meta pro TypeScript não reclamar
 declare global {
   interface Window {
     fbq: any;
-    dataLayer: any[];
   }
 }
 
@@ -47,17 +46,14 @@ export const TRACKING_FLUSH_MS = Math.max(600, PIXEL_FLUSH_MS + 200);
  *   PageView -> quando a pessoa abre a página;
  *   Reencaminhado -> quando ela é mandada pro jogo.
  *
- * Os `dataLayer.push` que sobraram existem só pro GTM (lado Google). O pixel do
- * Meta NÃO depende mais deles.
+ * Não há mais nenhuma camada de tag entre o código e o Meta: o GTM saiu da
+ * página em 03/ago, junto com os eventos falsos que ele disparava.
  */
 export function useRobloxAnalytics(origin?: TrackingOrigin) {
   const visitorId = useRef<string>('');
 
   // Toques no link de escape ("Não abriu? Toque aqui pra entrar")
   const manualClicks = useRef<number>(0);
-  // O StrictMode do dev monta o componente duas vezes — sem isto o `page_view`
-  // sairia em dobro pro GTM. (O pixel do Meta tem guarda própria em metaPixel.ts.)
-  const pageViewPushed = useRef<boolean>(false);
   // Garante que o MODO da saída (auto/manual) seja gravado uma vez só
   const redirectTracked = useRef<boolean>(false);
   // Resolve quando a linha do visitante já existe no banco. A saída pro jogo
@@ -177,11 +173,6 @@ export function useRobloxAnalytics(origin?: TrackingOrigin) {
 
       if (identity.fbclid) {
         console.log(`%c[TRACKING] Veio de anúncio — fbclid capturado.`, "color: #3b82f6;");
-      }
-      // Só pro GTM (lado Google). O pixel do Meta já disparou sozinho acima.
-      if (window.dataLayer && !pageViewPushed.current) {
-        pageViewPushed.current = true;
-        window.dataLayer.push({ event: 'page_view' });
       }
 
       const deviceType = getDeviceType();
@@ -345,11 +336,6 @@ export function useRobloxAnalytics(origin?: TrackingOrigin) {
           tempo_na_pagina_ms: Math.round(performance.now()),
         }),
       });
-
-      // Só pro GTM (lado Google) — o pixel do Meta já foi na linha de cima.
-      if (window.dataLayer) {
-        window.dataLayer.push({ event: 'entrou_no_jogo', event_id: eventId, redirect_mode: mode });
-      }
 
       // A linha do visitante nasce de forma assíncrona no primeiro acesso. Sem
       // esperar por ela, um redirect rápido faria o UPDATE não achar linha
